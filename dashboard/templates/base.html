@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LinkedIn Content Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        // Apply sidebar state immediately to prevent flash
+        (function() {
+            if (localStorage.getItem('sidebar-collapsed') === 'true') {
+                document.documentElement.classList.add('sidebar-collapsed');
+            }
+        })();
+    </script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'system-ui', 'sans-serif'] },
+                    colors: {
+                        surface: { page: '#f5f5f7', primary: '#ffffff', dark: '#0f0f0f' },
+                        accent: { DEFAULT: '#0071e3', light: '#e8f2fe' },
+                    },
+                    borderRadius: {
+                        'xl': '16px',
+                        '2xl': '20px',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="h-full">
+    <div class="app-shell">
+        <!-- Mobile overlay -->
+        <div class="mobile-overlay" onclick="toggleMobileMenu()"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="/static/images/logo-icon.svg" alt="LinkedIn Content Engine" class="sidebar-logo" style="width: auto; height: 32px; flex-shrink: 0;">
+                <span class="sidebar-brand">Content Engine</span>
+            </div>
+
+            <nav class="sidebar-nav">
+                <!-- Content group -->
+                <div class="sidebar-group">
+                    <div class="sidebar-group-label">Content</div>
+                    <a href="/" class="sidebar-link {% if page == 'queue' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                        <span class="sidebar-link-text">Queue</span>
+                    </a>
+                    <a href="/idea" class="sidebar-link {% if page == 'idea' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        <span class="sidebar-link-text">Idea Lab</span>
+                    </a>
+                    <a href="/research" class="sidebar-link {% if page == 'research' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                        <span class="sidebar-link-text">Research</span>
+                    </a>
+                </div>
+
+                <!-- Intelligence group -->
+                <div class="sidebar-group">
+                    <div class="sidebar-group-label">Intelligence</div>
+                    <a href="/analytics" class="sidebar-link {% if page == 'analytics' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                        <span class="sidebar-link-text">Analytics</span>
+                    </a>
+                    <a href="/learnings" class="sidebar-link {% if page == 'learnings' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/></svg>
+                        <span class="sidebar-link-text">Learnings</span>
+                    </a>
+                    <a href="/experiments" class="sidebar-link {% if page == 'experiments' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                        <span class="sidebar-link-text">Experiments</span>
+                    </a>
+                </div>
+
+                <!-- Manage group -->
+                <div class="sidebar-group">
+                    <div class="sidebar-group-label">Manage</div>
+                    <a href="/schedule" class="sidebar-link {% if page == 'schedule' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                        <span class="sidebar-link-text">Schedule</span>
+                    </a>
+                    <a href="/competitors" class="sidebar-link {% if page == 'competitors' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                        <span class="sidebar-link-text">Competitors</span>
+                    </a>
+                    <a href="/history" class="sidebar-link {% if page == 'history' %}active{% endif %}">
+                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span class="sidebar-link-text">History</span>
+                    </a>
+                </div>
+            </nav>
+
+            <!-- Sidebar footer -->
+            <div class="sidebar-footer">
+                {% if auth_status and auth_status.authenticated %}
+                    <div class="sidebar-auth sidebar-auth-connected">
+                        <span class="sidebar-auth-dot" style="background: var(--success);"></span>
+                        <span class="sidebar-auth-text">Connected</span>
+                    </div>
+                {% else %}
+                    <a href="/auth/login" class="sidebar-auth sidebar-auth-disconnected">
+                        <span class="sidebar-auth-dot" style="background: var(--danger);"></span>
+                        <span class="sidebar-auth-text">Connect LinkedIn</span>
+                    </a>
+                {% endif %}
+                <a href="/settings" class="sidebar-link {% if page == 'settings' %}active{% endif %}">
+                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                    <span class="sidebar-link-text">Settings</span>
+                </a>
+                <div style="margin-top: 8px; display: flex; justify-content: flex-end; padding: 0 6px;">
+                    <button onclick="toggleSidebar()" class="sidebar-toggle" title="Toggle sidebar">
+                        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/></svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main content area -->
+        <div class="app-content">
+            <!-- Top header -->
+            <header class="top-header">
+                <div class="flex items-center gap-3">
+                    <button onclick="toggleMobileMenu()" class="mobile-menu-btn" style="display:none; align-items:center; justify-content:center; width:36px; height:36px; border:none; background:none; cursor:pointer; color:var(--text-secondary);">
+                        <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                    </button>
+                    <span class="page-title">{% block page_title %}Dashboard{% endblock %}</span>
+                </div>
+                <div class="flex items-center gap-3">
+                    {% block header_actions %}{% endblock %}
+                </div>
+            </header>
+
+            <!-- Page content -->
+            <div class="content-wrapper page-enter">
+                {% block content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notification -->
+    <div id="toast" class="toast"></div>
+
+    <script>
+    function showToast(message, type = 'success') {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = `toast toast-${type} show`;
+        setTimeout(() => { toast.classList.remove('show'); }, 3000);
+    }
+    </script>
+    <script src="/static/js/dashboard.js" defer></script>
+</body>
+</html>

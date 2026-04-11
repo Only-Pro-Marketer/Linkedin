@@ -1,0 +1,1932 @@
+{% extends "base.html" %}
+
+{% block page_title %}Research{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between fade-in-up stagger-1">
+        <div>
+            <h1 class="section-heading">Research Hub</h1>
+            <p class="section-subheading">Trending e-commerce, supplement, and marketing topics</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="openAddItemModal()" class="btn btn-ghost btn-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                Add Item
+            </button>
+            <button onclick="toggleBatchMode()" id="batchModeBtn" class="btn btn-ghost btn-sm">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                Select
+            </button>
+            <button onclick="clearOldResearch()" class="btn btn-ghost btn-sm">Clear Old</button>
+            <button onclick="runResearch()" id="runBtn" class="btn btn-primary btn-md">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Run Research
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-5" id="statsCards">
+        <div class="glass-card stat-card fade-in-up stagger-1">
+            <p class="stat-label">Total Items</p>
+            <p class="stat-value" style="font-size:24px;" id="statTotal">--</p>
+        </div>
+        <div class="glass-card stat-card fade-in-up stagger-2">
+            <p class="stat-label">Saved</p>
+            <p class="stat-value" style="font-size:24px;" id="statSaved">--</p>
+        </div>
+        <div class="glass-card stat-card fade-in-up stagger-3">
+            <p class="stat-label">Unused</p>
+            <p class="stat-value" style="font-size:24px;" id="statUnused">--</p>
+        </div>
+        <div class="glass-card stat-card fade-in-up stagger-4">
+            <p class="stat-label">Used</p>
+            <p class="stat-value" style="font-size:24px;" id="statUsed">--</p>
+        </div>
+        <div class="glass-card stat-card fade-in-up stagger-5">
+            <p class="stat-label">Avg Relevance</p>
+            <p class="stat-value" style="font-size:24px;" id="statRelevance">--</p>
+        </div>
+        <div class="glass-card stat-card fade-in-up stagger-6">
+            <p class="stat-label">Last Run</p>
+            <p class="stat-value" style="font-size:14px;" id="statLastRun">--</p>
+        </div>
+    </div>
+
+    <!-- Research Performance Card -->
+    <div id="perfComparison" class="glass-card p-6 hidden">
+        <div class="flex items-center justify-between">
+            <div class="text-xs font-medium text-gray-500 uppercase tracking-wide">Research Performance</div>
+            <span id="perfLiftBadge" class="badge text-xs px-3 py-1"></span>
+        </div>
+        <div class="flex items-center gap-6 mt-3">
+            <div>
+                <div class="text-lg font-bold text-gray-900" id="perfResearchAvg">--</div>
+                <div class="text-xs text-gray-500">Research-based avg engagement</div>
+            </div>
+            <div class="text-gray-300 text-lg">vs</div>
+            <div>
+                <div class="text-lg font-bold text-gray-900" id="perfNonResearchAvg">--</div>
+                <div class="text-xs text-gray-500">Non-research avg engagement</div>
+            </div>
+            <div class="text-xs text-gray-400 ml-auto">
+                <span id="perfResearchCount">0</span> research / <span id="perfNonResearchCount">0</span> other
+            </div>
+        </div>
+    </div>
+
+    <!-- Topic Map -->
+    <div class="glass-card" style="padding:0; overflow:hidden;">
+        <!-- Toolbar -->
+        <div style="padding:16px 24px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
+            <div>
+                <h3 style="font-size:18px; font-weight:600; color:var(--text-primary); margin:0;">Topic Map</h3>
+                <p style="font-size:12px; color:var(--text-muted); margin:2px 0 0;">Drag nodes. Scroll to zoom. Click a topic to see details. Filter by category.</p>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px;">
+                <select id="map-cat-filter" onchange="filterMapCategory(this.value)" style="font-size:12px; padding:5px 10px; border:1px solid var(--border-primary); border-radius:8px; background:#fff; color:var(--text-secondary); outline:none;">
+                    <option value="">All Categories</option>
+                </select>
+                <button onclick="resetMapZoom()" class="btn btn-ghost btn-sm" style="font-size:12px;">Reset View</button>
+                <button onclick="loadTopicMap()" class="btn btn-ghost btn-sm" style="font-size:12px;">Refresh</button>
+            </div>
+        </div>
+        <!-- Canvas -->
+        <div id="topic-map-container" style="position:relative; width:100%; height:540px; background:#fafafc; cursor:grab;">
+            <canvas id="topic-map-canvas" style="display:block;"></canvas>
+            <div id="topic-map-tooltip" style="display:none; position:absolute; padding:10px 14px; background:rgba(15,15,15,0.92); color:#fff; font-size:12px; border-radius:10px; pointer-events:none; z-index:10; max-width:280px; line-height:1.5; backdrop-filter:blur(8px);"></div>
+            <div id="topic-map-loading" style="position:absolute; inset:0; display:flex; align-items:center; justify-content:center; color:var(--text-muted); font-size:13px;">Loading topic map...</div>
+            <!-- Selected node detail panel -->
+            <div id="map-detail-panel" style="display:none; position:absolute; right:16px; top:16px; width:260px; background:rgba(255,255,255,0.95); backdrop-filter:blur(16px); border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,0.1); padding:16px; z-index:20; font-size:13px;">
+                <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:10px;">
+                    <strong id="detail-title" style="font-size:14px; color:var(--text-primary); line-height:1.3;"></strong>
+                    <button onclick="closeDetailPanel()" style="background:none; border:none; cursor:pointer; color:var(--text-muted); font-size:18px; line-height:1;">&times;</button>
+                </div>
+                <div id="detail-body" style="color:var(--text-secondary); line-height:1.6;"></div>
+                <div style="margin-top:12px; display:flex; gap:6px;">
+                    <button onclick="createPostFromSelected()" class="btn btn-primary btn-sm" style="font-size:11px; flex:1;">Create Post</button>
+                    <button onclick="toggleSaveSelected()" id="detail-save-btn" class="btn btn-ghost btn-sm" style="font-size:11px;">Save</button>
+                </div>
+            </div>
+        </div>
+        <!-- Legend -->
+        <div id="topic-map-legend" style="padding:12px 24px; border-top:1px solid var(--border-subtle); display:flex; flex-wrap:wrap; gap:14px; font-size:11px; color:var(--text-secondary);"></div>
+    </div>
+
+    <!-- Source Breakdown -->
+    <div class="glass-card p-6" id="sourceBreakdown">
+        <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Sources Breakdown</div>
+        <div class="flex flex-wrap gap-3" id="sourceChips">
+            <span class="text-sm text-gray-400">Loading...</span>
+        </div>
+    </div>
+
+    <!-- Region & Category Breakdowns -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="glass-card p-6" id="regionBreakdown">
+            <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Region Breakdown</div>
+            <div class="flex flex-wrap gap-3" id="regionChips">
+                <span class="text-sm text-gray-400">Loading...</span>
+            </div>
+        </div>
+        <div class="glass-card p-6" id="categoryBreakdown">
+            <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-3">Category Breakdown</div>
+            <div class="flex flex-wrap gap-3" id="categoryChips">
+                <span class="text-sm text-gray-400">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="glass-card p-6">
+        <div class="flex flex-wrap items-center gap-3">
+            <span class="text-sm font-medium text-gray-700">Filter:</span>
+
+            <!-- Source filter -->
+            <select id="filterSource" onchange="loadResearchItems()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Sources</option>
+            </select>
+
+            <!-- Region filter -->
+            <select id="filterRegion" onchange="loadResearchItems()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Regions</option>
+                <option value="north_america">North America</option>
+                <option value="europe">Europe</option>
+                <option value="uk">UK / London</option>
+                <option value="global">Global</option>
+            </select>
+
+            <!-- Category filter -->
+            <select id="filterCategory" onchange="loadResearchItems()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">All Categories</option>
+                <option value="supplements">Supplements</option>
+                <option value="shopify">Shopify</option>
+                <option value="klaviyo">Klaviyo / Email</option>
+                <option value="cro">CRO</option>
+                <option value="amazon">Amazon</option>
+                <option value="paid_ads">Paid Ads</option>
+                <option value="tiktok_shop">TikTok Shop</option>
+                <option value="dtc">DTC</option>
+                <option value="agency">Agency</option>
+                <option value="ecommerce_general">E-commerce General</option>
+            </select>
+
+            <!-- Status filter buttons -->
+            <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5">
+                <button onclick="setFilter('all')" id="filterAll" class="filter-btn active text-sm px-3 py-1 rounded-md font-medium transition-all">All</button>
+                <button onclick="setFilter('saved')" id="filterSaved" class="filter-btn text-sm px-3 py-1 rounded-md font-medium transition-all">Saved</button>
+                <button onclick="setFilter('unused')" id="filterUnused" class="filter-btn text-sm px-3 py-1 rounded-md font-medium transition-all">Unused</button>
+                <button onclick="setFilter('trending')" id="filterTrending" class="filter-btn text-sm px-3 py-1 rounded-md font-medium transition-all">Trending</button>
+            </div>
+
+            <!-- Cluster View -->
+            <button onclick="toggleClusterView()" id="clusterToggleBtn" class="btn btn-ghost btn-sm text-xs">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                Cluster
+            </button>
+
+            <!-- Sort -->
+            <span class="text-sm font-medium text-gray-700">Sort:</span>
+            <select id="sortBy" onchange="applySortAndRender()" class="text-sm border border-gray-300 rounded-lg px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="relevance_desc">Relevance (highest)</option>
+                <option value="date_desc" selected>Date (newest)</option>
+                <option value="date_asc">Date (oldest)</option>
+                <option value="source_asc">Source A-Z</option>
+            </select>
+
+            <div class="flex-1"></div>
+
+            <!-- Search -->
+            <div class="relative">
+                <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="searchInput" placeholder="Search topics..." oninput="filterBySearch()" class="text-sm border border-gray-300 rounded-lg pl-9 pr-3 py-1.5 w-56 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+        </div>
+    </div>
+
+    <!-- Batch Action Bar -->
+    <div id="batchActionBar" class="glass-card p-4 hidden">
+        <div class="flex items-center justify-between flex-wrap gap-2">
+            <div class="flex items-center gap-3">
+                <button onclick="selectAllItems()" class="btn btn-ghost btn-sm text-xs">Select All</button>
+                <button onclick="deselectAllItems()" class="btn btn-ghost btn-sm text-xs">Deselect All</button>
+                <span id="selectedCount" class="text-sm text-gray-500 font-medium">0 selected</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <button onclick="batchSave()" class="btn btn-sm bg-amber-50 text-amber-700 border border-amber-200 text-xs">Save All</button>
+                <button onclick="batchMarkUsed()" class="btn btn-ghost btn-sm text-xs">Mark Used</button>
+                <button onclick="batchCreatePosts()" class="btn btn-sm bg-green-50 text-green-700 border border-green-200 text-xs">Create Posts</button>
+                <button onclick="batchDelete()" class="btn btn-sm bg-red-50 text-red-700 border border-red-200 text-xs">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Research Items List -->
+    <div id="researchList" class="space-y-3">
+        <div class="text-center py-12 text-gray-400">Loading research items...</div>
+    </div>
+
+</div>
+
+<!-- Detail Modal -->
+<div id="detailModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center" onclick="if(event.target===this)closeModal()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full mx-4 max-h-[85vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div class="flex-1">
+                    <div class="flex items-center gap-2 mb-2 flex-wrap">
+                        <span id="modalSource" class="badge"></span>
+                        <span id="modalRegion" class="badge" style="display:none"></span>
+                        <span id="modalCategory" class="badge" style="display:none"></span>
+                        <span id="modalRelevance" class="badge bg-purple-50 text-purple-700"></span>
+                    </div>
+                    <h2 id="modalTitle" class="text-lg font-bold text-gray-900"></h2>
+                </div>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <div class="mb-4">
+                <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Topic</div>
+                <div id="modalTopic" class="text-sm text-gray-800 font-medium"></div>
+            </div>
+
+            <div class="mb-4">
+                <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Content</div>
+                <div id="modalContent" class="text-sm text-gray-700 whitespace-pre-line bg-gray-50 rounded-xl p-4 border border-gray-100"></div>
+            </div>
+
+            <div id="modalUrlRow" class="mb-4 hidden">
+                <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source URL</div>
+                <a id="modalUrl" href="#" target="_blank" class="text-sm text-blue-600 hover:underline break-all"></a>
+            </div>
+
+            <div class="mb-4">
+                <div class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Notes</div>
+                <textarea id="modalNotes" rows="2" class="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Add your notes here..."
+                    onblur="saveNotes()"></textarea>
+            </div>
+
+            <div class="flex items-center justify-between text-xs text-gray-500 mb-5">
+                <span id="modalDate"></span>
+                <div class="flex items-center gap-2">
+                    <span id="modalUsedBadge" class="badge"></span>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2 border-t border-gray-100 pt-4">
+                <button onclick="toggleSaveFromModal()" id="modalSaveBtn" class="btn btn-md flex-1">
+                    Save
+                </button>
+                <button onclick="createPostFromResearch()" id="modalCreateBtn" class="btn btn-md flex-1 bg-green-600 text-white hover:bg-green-700">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                    Create Post
+                </button>
+                <button onclick="toggleUsedFromModal()" id="modalUseBtn" class="btn btn-ghost btn-md">
+                    Mark Used
+                </button>
+                <button onclick="deleteFromModal()" class="btn btn-danger btn-md">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Post Created Modal (shows virality score) -->
+<div id="postCreatedModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center" onclick="if(event.target===this)closePostCreatedModal()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4 max-h-[85vh] overflow-y-auto">
+        <div class="p-6">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div>
+                    <h2 class="text-lg font-bold text-gray-900">Post Created!</h2>
+                    <p class="text-sm text-gray-500">Your post has been added to the queue</p>
+                </div>
+                <button onclick="closePostCreatedModal()" class="ml-auto text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Virality Score Circle -->
+            <div class="flex items-center justify-center mb-5">
+                <div class="relative w-32 h-32">
+                    <svg class="w-32 h-32 transform -rotate-90" viewBox="0 0 120 120">
+                        <circle cx="60" cy="60" r="52" fill="none" stroke="#e5e7eb" stroke-width="10"/>
+                        <circle id="pcScoreCircle" cx="60" cy="60" r="52" fill="none" stroke="#22c55e" stroke-width="10"
+                            stroke-dasharray="326.73" stroke-dashoffset="326.73" stroke-linecap="round"
+                            style="transition: stroke-dashoffset 1s ease-out;"/>
+                    </svg>
+                    <div class="absolute inset-0 flex flex-col items-center justify-center">
+                        <span id="pcScoreNum" class="text-3xl font-bold text-gray-900">--</span>
+                        <span class="text-xs text-gray-500">Virality</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Tier -->
+            <div class="text-center mb-4">
+                <span id="pcPerformanceBadge" class="inline-block px-4 py-1.5 rounded-full text-sm font-semibold"></span>
+            </div>
+
+            <!-- Score Breakdown -->
+            <div id="pcBreakdown" class="space-y-2 mb-5">
+            </div>
+
+            <!-- Verdict -->
+            <div id="pcVerdict" class="text-sm text-gray-600 text-center mb-4 italic"></div>
+
+            <!-- Actions -->
+            <div class="flex items-center gap-3 border-t border-gray-100 pt-4">
+                <a id="pcViewInQueue" href="/" class="btn btn-primary btn-md flex-1 text-center">View in Queue</a>
+                <button onclick="closePostCreatedModal()" class="btn btn-ghost btn-md flex-1">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Item Modal -->
+<div id="addItemModal" class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 hidden items-center justify-center" onclick="if(event.target===this)closeAddItemModal()">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full mx-4">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-lg font-bold text-gray-900">Add Research Item</h2>
+                <button onclick="closeAddItemModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Topic *</label>
+                    <input type="text" id="addTopic" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="e.g., Klaviyo flow automation">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Title</label>
+                    <input type="text" id="addTitle" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Content / Notes</label>
+                    <textarea id="addContent" rows="3" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                </div>
+                <div>
+                    <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">URL (optional)</label>
+                    <input type="text" id="addUrl" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Category</label>
+                        <select id="addCategory" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">None</option>
+                            <option value="supplements">Supplements</option>
+                            <option value="shopify">Shopify</option>
+                            <option value="klaviyo">Klaviyo / Email</option>
+                            <option value="cro">CRO</option>
+                            <option value="amazon">Amazon</option>
+                            <option value="paid_ads">Paid Ads</option>
+                            <option value="tiktok_shop">TikTok Shop</option>
+                            <option value="dtc">DTC</option>
+                            <option value="agency">Agency</option>
+                            <option value="ecommerce_general">E-commerce General</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-xs font-medium text-gray-500 uppercase tracking-wide">Region</label>
+                        <select id="addRegion" class="w-full mt-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="">None</option>
+                            <option value="north_america">North America</option>
+                            <option value="europe">Europe</option>
+                            <option value="uk">UK / London</option>
+                            <option value="global">Global</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="flex items-center gap-2 mt-5 border-t border-gray-100 pt-4">
+                <button onclick="submitAddItem()" class="btn btn-primary btn-md flex-1">Add Item</button>
+                <button onclick="closeAddItemModal()" class="btn btn-ghost btn-md flex-1">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .filter-btn { color: #6b7280; }
+    .filter-btn.active { background: white; color: #1d4ed8; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+    .source-google_trends { background: #fef3c7; color: #92400e; }
+    .source-reddit { background: #fee2e2; color: #991b1b; }
+    .source-news { background: #dbeafe; color: #1e40af; }
+    .source-rss { background: #e0e7ff; color: #3730a3; }
+    .source-linkedin { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; }
+    .source-unknown { background: #f3f4f6; color: #374151; }
+    .source-manual { background: #f0fdf4; color: #166534; border: 1px solid #86efac; }
+    .relevance-high { background: #dcfce7; color: #166534; }
+    .relevance-med { background: #fef9c3; color: #854d0e; }
+    .relevance-low { background: #f3f4f6; color: #6b7280; }
+    .score-bar { height: 6px; border-radius: 3px; background: #e5e7eb; overflow: hidden; }
+    .score-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease-out; }
+
+    /* Region badge colors */
+    .region-north_america { background: #dbeafe; color: #1e40af; }
+    .region-europe { background: #ede9fe; color: #5b21b6; }
+    .region-uk { background: #fce7f3; color: #9d174d; }
+    .region-global { background: #f3f4f6; color: #374151; }
+
+    /* Category badge colors */
+    .category-supplements { background: #dcfce7; color: #166534; }
+    .category-shopify { background: #d1fae5; color: #065f46; }
+    .category-klaviyo { background: #fef3c7; color: #92400e; }
+    .category-cro { background: #e0e7ff; color: #3730a3; }
+    .category-amazon { background: #ffedd5; color: #9a3412; }
+    .category-paid_ads { background: #fce7f3; color: #9d174d; }
+    .category-tiktok_shop { background: #f0fdf4; color: #15803d; }
+    .category-dtc { background: #f5f3ff; color: #6d28d9; }
+    .category-agency { background: #ecfeff; color: #155e75; }
+    .category-ecommerce_general { background: #f8fafc; color: #475569; }
+
+    /* Velocity badges */
+    .velocity-rising { background: #dcfce7; color: #166534; }
+    .velocity-stable { background: #f3f4f6; color: #6b7280; }
+    .velocity-falling { background: #fee2e2; color: #991b1b; }
+    .velocity-new { background: #dbeafe; color: #1e40af; }
+</style>
+
+<script>
+let allItems = [];
+let currentFilter = 'all';
+let currentItemId = null;
+let currentSort = 'date_desc';
+let batchMode = false;
+let selectedItemIds = new Set();
+let clusterView = false;
+
+// ── Init ──
+document.addEventListener('DOMContentLoaded', () => {
+    loadResearchStats();
+    loadResearchSources();
+    loadResearchItems();
+    loadPerformanceStats();
+    loadTopicMap();
+});
+
+// ── Stats ──
+async function loadResearchStats() {
+    try {
+        const res = await fetch('/api/research/stats');
+        const data = await res.json();
+        document.getElementById('statTotal').textContent = data.total_items || 0;
+        document.getElementById('statSaved').textContent = data.saved_items || 0;
+        document.getElementById('statUnused').textContent = data.unused_items || 0;
+        document.getElementById('statUsed').textContent = data.used_items || 0;
+        document.getElementById('statRelevance').textContent = data.avg_relevance ? (data.avg_relevance * 100).toFixed(0) + '%' : '0%';
+        if (data.last_run) {
+            const d = new Date(data.last_run);
+            document.getElementById('statLastRun').textContent = d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        } else {
+            document.getElementById('statLastRun').textContent = 'Never';
+        }
+
+        // Source breakdown chips
+        if (data.sources && Object.keys(data.sources).length > 0) {
+            const chipsEl = document.getElementById('sourceChips');
+            chipsEl.innerHTML = Object.entries(data.sources)
+                .sort((a, b) => b[1] - a[1])
+                .map(([source, count]) => {
+                    const cls = getSourceClass(source);
+                    return `<span class="badge ${cls} text-xs px-3 py-1">${formatSource(source)}: ${count}</span>`;
+                }).join('');
+        } else {
+            document.getElementById('sourceChips').innerHTML = '<span class="text-sm text-gray-400">No research data yet</span>';
+        }
+
+        // Region breakdown chips
+        if (data.regions && Object.keys(data.regions).length > 0) {
+            document.getElementById('regionChips').innerHTML = Object.entries(data.regions)
+                .sort((a, b) => b[1] - a[1])
+                .map(([region, count]) => {
+                    const cls = getRegionClass(region);
+                    return `<span class="badge ${cls} text-xs px-3 py-1">${formatRegion(region)}: ${count}</span>`;
+                }).join('');
+        } else {
+            document.getElementById('regionChips').innerHTML = '<span class="text-sm text-gray-400">No data</span>';
+        }
+
+        // Category breakdown chips
+        if (data.categories && Object.keys(data.categories).length > 0) {
+            document.getElementById('categoryChips').innerHTML = Object.entries(data.categories)
+                .sort((a, b) => b[1] - a[1])
+                .map(([cat, count]) => {
+                    const cls = getCategoryClass(cat);
+                    return `<span class="badge ${cls} text-xs px-3 py-1">${formatCategory(cat)}: ${count}</span>`;
+                }).join('');
+        } else {
+            document.getElementById('categoryChips').innerHTML = '<span class="text-sm text-gray-400">No data</span>';
+        }
+    } catch (e) {
+        console.error('Failed to load stats:', e);
+    }
+}
+
+// ── Performance stats ──
+async function loadPerformanceStats() {
+    try {
+        const res = await fetch('/api/research/performance');
+        const data = await res.json();
+        if (data.research_based_count > 0) {
+            document.getElementById('perfComparison').classList.remove('hidden');
+            document.getElementById('perfResearchAvg').textContent = data.research_avg_engagement;
+            document.getElementById('perfNonResearchAvg').textContent = data.non_research_avg_engagement;
+            document.getElementById('perfResearchCount').textContent = data.research_based_count;
+            document.getElementById('perfNonResearchCount').textContent = data.non_research_count;
+            const badge = document.getElementById('perfLiftBadge');
+            if (data.lift_pct > 0) {
+                badge.className = 'badge bg-green-50 text-green-700 text-xs px-3 py-1';
+                badge.textContent = `+${data.lift_pct}% lift`;
+            } else if (data.lift_pct < 0) {
+                badge.className = 'badge bg-red-50 text-red-700 text-xs px-3 py-1';
+                badge.textContent = `${data.lift_pct}%`;
+            } else {
+                badge.className = 'badge bg-gray-50 text-gray-700 text-xs px-3 py-1';
+                badge.textContent = 'Even';
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load performance stats:', e);
+    }
+}
+
+// ── Sources dropdown ──
+async function loadResearchSources() {
+    try {
+        const res = await fetch('/api/research/sources');
+        const sources = await res.json();
+        const sel = document.getElementById('filterSource');
+        sel.innerHTML = '<option value="">All Sources</option>';
+        for (const s of sources) {
+            sel.innerHTML += `<option value="${s.source}">${formatSource(s.source)} (${s.count})</option>`;
+        }
+    } catch (e) {
+        console.error('Failed to load sources:', e);
+    }
+}
+
+// ── Load items ──
+async function loadResearchItems() {
+    const source = document.getElementById('filterSource').value;
+    const region = document.getElementById('filterRegion').value;
+    const category = document.getElementById('filterCategory').value;
+    const savedOnly = currentFilter === 'saved';
+    const unusedOnly = currentFilter === 'unused';
+
+    let url = `/api/research/items?limit=200`;
+    if (source) url += `&source=${encodeURIComponent(source)}`;
+    if (region) url += `&region=${encodeURIComponent(region)}`;
+    if (category) url += `&category=${encodeURIComponent(category)}`;
+    if (savedOnly) url += `&saved_only=true`;
+    if (unusedOnly) url += `&unused_only=true`;
+
+    try {
+        const res = await fetch(url);
+        allItems = await res.json();
+
+        // Client-side trending filter
+        let displayItems = allItems;
+        if (currentFilter === 'trending') {
+            displayItems = allItems.filter(i => i.velocity === 'rising' || (i.appearance_count && i.appearance_count >= 2));
+        }
+
+        if (clusterView) {
+            renderClusters(sortItems(displayItems));
+        } else {
+            renderItems(sortItems(displayItems));
+        }
+    } catch (e) {
+        document.getElementById('researchList').innerHTML = '<div class="text-center py-12 text-red-500">Failed to load research items</div>';
+    }
+}
+
+function sortItems(items) {
+    const sorted = [...items];
+    switch (currentSort) {
+        case 'relevance_desc':
+            sorted.sort((a, b) => (b.relevance_score || 0) - (a.relevance_score || 0));
+            break;
+        case 'date_desc':
+            sorted.sort((a, b) => new Date(b.fetched_at || 0) - new Date(a.fetched_at || 0));
+            break;
+        case 'date_asc':
+            sorted.sort((a, b) => new Date(a.fetched_at || 0) - new Date(b.fetched_at || 0));
+            break;
+        case 'source_asc':
+            sorted.sort((a, b) => (a.source || '').localeCompare(b.source || ''));
+            break;
+    }
+    return sorted;
+}
+
+function applySortAndRender() {
+    currentSort = document.getElementById('sortBy').value;
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    let items = allItems;
+    if (currentFilter === 'trending') {
+        items = items.filter(i => i.velocity === 'rising' || (i.appearance_count && i.appearance_count >= 2));
+    }
+    if (q) {
+        items = items.filter(item =>
+            (item.title || '').toLowerCase().includes(q) ||
+            (item.topic || '').toLowerCase().includes(q) ||
+            (item.content || '').toLowerCase().includes(q)
+        );
+    }
+    const sorted = sortItems(items);
+    if (clusterView) {
+        renderClusters(sorted);
+    } else {
+        renderItems(sorted);
+    }
+}
+
+function filterBySearch() {
+    const q = document.getElementById('searchInput').value.toLowerCase();
+    let items = allItems;
+    if (currentFilter === 'trending') {
+        items = items.filter(i => i.velocity === 'rising' || (i.appearance_count && i.appearance_count >= 2));
+    }
+    if (q) {
+        items = items.filter(item =>
+            (item.title || '').toLowerCase().includes(q) ||
+            (item.topic || '').toLowerCase().includes(q) ||
+            (item.content || '').toLowerCase().includes(q)
+        );
+    }
+    const sorted = sortItems(items);
+    if (clusterView) {
+        renderClusters(sorted);
+    } else {
+        renderItems(sorted);
+    }
+}
+
+function setFilter(filter) {
+    currentFilter = filter;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`filter${filter.charAt(0).toUpperCase() + filter.slice(1)}`).classList.add('active');
+    loadResearchItems();
+}
+
+// ── Cluster view ──
+function toggleClusterView() {
+    clusterView = !clusterView;
+    const btn = document.getElementById('clusterToggleBtn');
+    if (clusterView) {
+        btn.classList.add('bg-blue-50', 'text-blue-700');
+    } else {
+        btn.classList.remove('bg-blue-50', 'text-blue-700');
+    }
+    loadResearchItems();
+}
+
+function renderClusters(items) {
+    const container = document.getElementById('researchList');
+
+    if (!items.length) {
+        container.innerHTML = `
+            <div class="text-center py-16">
+                <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <p class="text-gray-500 font-medium">No research items found</p>
+            </div>`;
+        return;
+    }
+
+    // Group by normalized_topic_key
+    const clusters = {};
+    for (const item of items) {
+        const key = item.normalized_topic_key || item.topic || 'uncategorized';
+        if (!clusters[key]) clusters[key] = [];
+        clusters[key].push(item);
+    }
+
+    // Sort clusters by avg relevance desc
+    const sortedClusters = Object.entries(clusters)
+        .map(([key, clusterItems]) => ({
+            key,
+            items: clusterItems,
+            avgRelevance: clusterItems.reduce((sum, i) => sum + (i.relevance_score || 0), 0) / clusterItems.length,
+            count: clusterItems.length,
+            hasRising: clusterItems.some(i => i.velocity === 'rising'),
+        }))
+        .sort((a, b) => b.avgRelevance - a.avgRelevance);
+
+    container.innerHTML = sortedClusters.map((cluster, idx) => {
+        const relevancePct = (cluster.avgRelevance * 100).toFixed(0);
+        const risingTag = cluster.hasRising ? '<span class="badge velocity-rising text-[11px]">↑ Rising</span>' : '';
+        const displayKey = cluster.key.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+        return `
+        <div class="glass-card overflow-hidden">
+            <div class="p-3 bg-gray-50 border-b border-gray-100 cursor-pointer flex items-center justify-between"
+                 onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.cluster-chevron').classList.toggle('rotate-90')">
+                <div class="flex items-center gap-2">
+                    <svg class="w-4 h-4 text-gray-400 transition-transform cluster-chevron ${idx === 0 ? 'rotate-90' : ''}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                    <span class="text-sm font-semibold text-gray-800">${escapeHtml(displayKey)}</span>
+                    <span class="badge bg-gray-100 text-gray-600 text-[11px]">${cluster.count} item${cluster.count > 1 ? 's' : ''}</span>
+                    <span class="badge bg-purple-50 text-purple-700 text-[11px]">${relevancePct}% avg</span>
+                    ${risingTag}
+                </div>
+            </div>
+            <div class="${idx === 0 ? '' : 'hidden'} divide-y divide-gray-50">
+                ${cluster.items.slice(0, 10).map(item => renderClusterItem(item)).join('')}
+                ${cluster.items.length > 10 ? `<div class="p-3 text-center text-xs text-gray-400">+ ${cluster.items.length - 10} more items</div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function renderClusterItem(item) {
+    const sourceClass = getSourceClass(item.source);
+    const relevancePct = (item.relevance_score * 100).toFixed(0);
+    const relevanceClass = item.relevance_score >= 0.7 ? 'relevance-high' : item.relevance_score >= 0.4 ? 'relevance-med' : 'relevance-low';
+    const usedBadge = item.used ? '<span class="badge bg-green-50 text-green-700 text-[11px]">Used</span>' : '';
+    const velocityBadge = item.velocity && item.velocity !== 'new' ? `<span class="badge velocity-${item.velocity} text-[11px]">${
+        item.velocity === 'rising' ? '↑' : item.velocity === 'falling' ? '↓' : '~'
+    }</span>` : '';
+
+    return `
+    <div class="p-3 hover:bg-gray-50 cursor-pointer flex items-center gap-3" onclick="showDetail(${item.id})">
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-0.5 flex-wrap">
+                <span class="badge ${sourceClass} text-[11px]">${formatSource(item.source)}</span>
+                <span class="badge ${relevanceClass} text-[11px]">${relevancePct}%</span>
+                ${velocityBadge}
+                ${usedBadge}
+            </div>
+            <h4 class="text-sm font-medium text-gray-900 truncate">${escapeHtml(item.title || item.topic || 'Untitled')}</h4>
+        </div>
+        <button onclick="event.stopPropagation(); quickCreatePost(${item.id})" class="px-2 py-1 text-[11px] font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors whitespace-nowrap">+ Post</button>
+    </div>`;
+}
+
+// ── Render items ──
+function renderItems(items) {
+    const container = document.getElementById('researchList');
+
+    if (!items.length) {
+        container.innerHTML = `
+            <div class="text-center py-16">
+                <svg class="w-12 h-12 mx-auto text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <p class="text-gray-500 font-medium">No research items found</p>
+                <p class="text-gray-400 text-sm mt-1">Click "Run Research" to fetch trending topics</p>
+            </div>`;
+        return;
+    }
+
+    container.innerHTML = items.map(item => {
+        const sourceClass = getSourceClass(item.source);
+        const relevanceClass = item.relevance_score >= 0.7 ? 'relevance-high' : item.relevance_score >= 0.4 ? 'relevance-med' : 'relevance-low';
+        const relevancePct = (item.relevance_score * 100).toFixed(0);
+        const savedIcon = item.saved
+            ? '<svg class="w-4 h-4 text-amber-500" fill="currentColor" viewBox="0 0 24 24"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>'
+            : '<svg class="w-4 h-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>';
+        const usedBadge = item.used ? '<span class="badge bg-green-50 text-green-700 text-[11px]">Used</span>' : '';
+        const velocityBadge = item.velocity ? `<span class="badge velocity-${item.velocity} text-[11px]">${
+            item.velocity === 'rising' ? '↑ Rising' :
+            item.velocity === 'falling' ? '↓ Falling' :
+            item.velocity === 'stable' ? '~ Stable' : '★ New'
+        }${item.appearance_count > 1 ? ` (${item.appearance_count}x)` : ''}</span>` : '';
+        const notesBadge = item.notes ? '<span class="badge bg-yellow-50 text-yellow-700 text-[11px]">📝</span>' : '';
+        const perfBadge = item.performance_score != null ?
+            (item.performance_score >= 50 ? '<span class="badge bg-green-50 text-green-700 text-[11px]">★ High Perf</span>' :
+             item.performance_score >= 20 ? '<span class="badge bg-blue-50 text-blue-700 text-[11px]">● Good Perf</span>' : '') : '';
+        const dateStr = item.fetched_at ? new Date(item.fetched_at).toLocaleDateString() : '';
+        const contentPreview = (item.content || '').substring(0, 120) + ((item.content || '').length > 120 ? '...' : '');
+
+        // Relevance bar color
+        let barColor = '#9ca3af';
+        if (item.relevance_score >= 0.7) barColor = '#22c55e';
+        else if (item.relevance_score >= 0.4) barColor = '#eab308';
+
+        const checkboxHtml = batchMode ? `
+            <input type="checkbox" class="research-checkbox w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1 shrink-0"
+                value="${item.id}"
+                ${selectedItemIds.has(item.id) ? 'checked' : ''}
+                onclick="event.stopPropagation()"
+                onchange="toggleItemSelection(${item.id})">
+        ` : '';
+
+        return `
+        <div class="glass-card p-6 hover:shadow-md transition-shadow cursor-pointer fade-in ${selectedItemIds.has(item.id) ? 'ring-2 ring-blue-300' : ''}" onclick="showDetail(${item.id})">
+            <div class="flex items-start gap-3">
+                ${checkboxHtml}
+                <button onclick="event.stopPropagation(); toggleSave(${item.id})" class="mt-0.5 hover:scale-110 transition-transform" title="${item.saved ? 'Unsave' : 'Save'}">
+                    ${savedIcon}
+                </button>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1.5 flex-wrap">
+                        <span class="badge ${sourceClass} text-[11px]">${formatSource(item.source)}</span>
+                        ${item.region ? `<span class="badge ${getRegionClass(item.region)} text-[11px]">${formatRegion(item.region)}</span>` : ''}
+                        ${item.category ? `<span class="badge ${getCategoryClass(item.category)} text-[11px]">${formatCategory(item.category)}</span>` : ''}
+                        <span class="badge ${relevanceClass} text-[11px]">${relevancePct}% relevant</span>
+                        ${velocityBadge}
+                        ${usedBadge}
+                        ${perfBadge}
+                        ${notesBadge}
+                        <span class="text-[11px] text-gray-400 ml-auto">${dateStr}</span>
+                    </div>
+                    <h3 class="text-sm font-semibold text-gray-900 truncate">${escapeHtml(item.title || item.topic || 'Untitled')}</h3>
+                    <p class="text-xs text-gray-500 mt-0.5 truncate">${escapeHtml(item.topic || '')}</p>
+                    <p class="text-xs text-gray-400 mt-1 line-clamp-2">${escapeHtml(contentPreview)}</p>
+                    <!-- Relevance bar -->
+                    <div class="score-bar mt-2 w-32">
+                        <div class="score-bar-fill" style="width: ${relevancePct}%; background: ${barColor};"></div>
+                    </div>
+                </div>
+                <!-- Quick Create Post button -->
+                <button onclick="event.stopPropagation(); quickCreatePost(${item.id})" class="mt-1 px-2 py-1 text-[11px] font-medium text-green-700 bg-green-50 rounded-lg hover:bg-green-100 transition-colors whitespace-nowrap" title="Create LinkedIn post from this research">
+                    + Post
+                </button>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── Add Item modal ──
+function openAddItemModal() {
+    document.getElementById('addItemModal').classList.remove('hidden');
+    document.getElementById('addItemModal').classList.add('flex');
+    document.getElementById('addTopic').focus();
+}
+
+function closeAddItemModal() {
+    document.getElementById('addItemModal').classList.add('hidden');
+    document.getElementById('addItemModal').classList.remove('flex');
+    document.getElementById('addTopic').value = '';
+    document.getElementById('addTitle').value = '';
+    document.getElementById('addContent').value = '';
+    document.getElementById('addUrl').value = '';
+    document.getElementById('addCategory').value = '';
+    document.getElementById('addRegion').value = '';
+}
+
+async function submitAddItem() {
+    const topic = document.getElementById('addTopic').value.trim();
+    if (!topic) { showToast('Topic is required', 'error'); return; }
+    try {
+        const res = await fetch('/api/research/items', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                topic,
+                title: document.getElementById('addTitle').value.trim(),
+                content: document.getElementById('addContent').value.trim(),
+                url: document.getElementById('addUrl').value.trim(),
+                category: document.getElementById('addCategory').value,
+                region: document.getElementById('addRegion').value,
+            })
+        });
+        const data = await res.json();
+        showToast('Research item added', 'success');
+        closeAddItemModal();
+        loadResearchItems();
+        loadResearchStats();
+        loadResearchSources();
+    } catch (e) { showToast('Failed to add item', 'error'); }
+}
+
+// ── Notes ──
+async function saveNotes() {
+    if (!currentItemId) return;
+    const notes = document.getElementById('modalNotes').value;
+    try {
+        await fetch(`/api/research/items/${currentItemId}/notes`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({notes})
+        });
+        const item = allItems.find(i => i.id === currentItemId);
+        if (item) item.notes = notes;
+    } catch (e) { /* silently fail — notes will be lost */ }
+}
+
+// ── Batch mode ──
+function toggleBatchMode() {
+    batchMode = !batchMode;
+    const btn = document.getElementById('batchModeBtn');
+    const bar = document.getElementById('batchActionBar');
+    if (batchMode) {
+        btn.classList.add('bg-blue-50', 'text-blue-700');
+        bar.classList.remove('hidden');
+    } else {
+        btn.classList.remove('bg-blue-50', 'text-blue-700');
+        bar.classList.add('hidden');
+        selectedItemIds.clear();
+    }
+    applySortAndRender();
+}
+
+function toggleItemSelection(id) {
+    if (selectedItemIds.has(id)) {
+        selectedItemIds.delete(id);
+    } else {
+        selectedItemIds.add(id);
+    }
+    updateSelectedCount();
+    applySortAndRender();
+}
+
+function selectAllItems() {
+    allItems.forEach(item => selectedItemIds.add(item.id));
+    updateSelectedCount();
+    applySortAndRender();
+}
+
+function deselectAllItems() {
+    selectedItemIds.clear();
+    updateSelectedCount();
+    applySortAndRender();
+}
+
+function updateSelectedCount() {
+    document.getElementById('selectedCount').textContent = `${selectedItemIds.size} selected`;
+}
+
+function getSelectedIds() {
+    return Array.from(selectedItemIds);
+}
+
+async function batchSave() {
+    const ids = getSelectedIds();
+    if (!ids.length) { showToast('Select items first', 'info'); return; }
+    try {
+        const res = await fetch('/api/research/batch/save', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_ids: ids})
+        });
+        const data = await res.json();
+        showToast(`${data.count} items saved`, 'success');
+        selectedItemIds.clear(); updateSelectedCount();
+        loadResearchItems(); loadResearchStats();
+    } catch (e) { showToast('Batch save failed', 'error'); }
+}
+
+async function batchMarkUsed() {
+    const ids = getSelectedIds();
+    if (!ids.length) { showToast('Select items first', 'info'); return; }
+    try {
+        const res = await fetch('/api/research/batch/mark-used', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_ids: ids})
+        });
+        const data = await res.json();
+        showToast(`${data.count} items marked used`, 'success');
+        selectedItemIds.clear(); updateSelectedCount();
+        loadResearchItems(); loadResearchStats();
+    } catch (e) { showToast('Batch mark used failed', 'error'); }
+}
+
+async function batchDelete() {
+    const ids = getSelectedIds();
+    if (!ids.length) { showToast('Select items first', 'info'); return; }
+    if (!confirm(`Delete ${ids.length} research items?`)) return;
+    try {
+        const res = await fetch('/api/research/batch/delete', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_ids: ids})
+        });
+        const data = await res.json();
+        showToast(`${data.count} items deleted`, 'success');
+        selectedItemIds.clear(); updateSelectedCount();
+        loadResearchItems(); loadResearchStats();
+    } catch (e) { showToast('Batch delete failed', 'error'); }
+}
+
+async function batchCreatePosts() {
+    const ids = getSelectedIds();
+    if (!ids.length) { showToast('Select items first', 'info'); return; }
+    if (!confirm(`Create posts from ${ids.length} research items? This may take a moment.`)) return;
+    showToast(`Creating ${ids.length} posts...`, 'info');
+    try {
+        const res = await fetch('/api/research/batch/create-posts', {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({item_ids: ids})
+        });
+        const data = await res.json();
+        showToast(`${data.count} posts created`, 'success');
+        selectedItemIds.clear(); updateSelectedCount();
+        loadResearchItems(); loadResearchStats();
+    } catch (e) { showToast('Batch post creation failed', 'error'); }
+}
+
+// ── Detail modal ──
+function showDetail(id) {
+    const item = allItems.find(i => i.id === id);
+    if (!item) return;
+    currentItemId = id;
+
+    const sourceClass = getSourceClass(item.source);
+    document.getElementById('modalSource').className = `badge ${sourceClass}`;
+    document.getElementById('modalSource').textContent = formatSource(item.source);
+    document.getElementById('modalRelevance').textContent = `${(item.relevance_score * 100).toFixed(0)}% relevance`;
+
+    // Region badge
+    const regionEl = document.getElementById('modalRegion');
+    if (item.region) {
+        regionEl.className = `badge ${getRegionClass(item.region)}`;
+        regionEl.textContent = formatRegion(item.region);
+        regionEl.style.display = '';
+    } else {
+        regionEl.style.display = 'none';
+    }
+
+    // Category badge
+    const catEl = document.getElementById('modalCategory');
+    if (item.category) {
+        catEl.className = `badge ${getCategoryClass(item.category)}`;
+        catEl.textContent = formatCategory(item.category);
+        catEl.style.display = '';
+    } else {
+        catEl.style.display = 'none';
+    }
+
+    document.getElementById('modalTitle').textContent = item.title || item.topic || 'Untitled';
+    document.getElementById('modalTopic').textContent = item.topic || 'N/A';
+    document.getElementById('modalContent').textContent = item.content || 'No content available';
+    document.getElementById('modalDate').textContent = item.fetched_at ? `Fetched: ${new Date(item.fetched_at).toLocaleString()}` : '';
+    document.getElementById('modalNotes').value = item.notes || '';
+
+    // URL
+    if (item.url) {
+        document.getElementById('modalUrlRow').classList.remove('hidden');
+        document.getElementById('modalUrl').href = item.url;
+        document.getElementById('modalUrl').textContent = item.url;
+    } else {
+        document.getElementById('modalUrlRow').classList.add('hidden');
+    }
+
+    // Used badge
+    document.getElementById('modalUsedBadge').className = item.used ? 'badge bg-green-50 text-green-700' : 'badge bg-gray-100 text-gray-500';
+    document.getElementById('modalUsedBadge').textContent = item.used ? 'Used' : 'Unused';
+
+    // Save button
+    updateModalSaveBtn(item.saved);
+    updateModalUseBtn(item.used);
+
+    document.getElementById('detailModal').classList.remove('hidden');
+    document.getElementById('detailModal').classList.add('flex');
+}
+
+function closeModal() {
+    document.getElementById('detailModal').classList.add('hidden');
+    document.getElementById('detailModal').classList.remove('flex');
+    currentItemId = null;
+}
+
+function updateModalSaveBtn(saved) {
+    const btn = document.getElementById('modalSaveBtn');
+    if (saved) {
+        btn.className = 'btn btn-md flex-1 bg-amber-50 text-amber-700 border border-amber-200';
+        btn.innerHTML = '<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg> Saved';
+    } else {
+        btn.className = 'btn btn-md flex-1 bg-gray-50 text-gray-700 border border-gray-200';
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg> Save';
+    }
+}
+
+function updateModalUseBtn(used) {
+    const btn = document.getElementById('modalUseBtn');
+    btn.textContent = used ? 'Mark Unused' : 'Mark Used';
+}
+
+// ── Create Post from Research ──
+async function createPostFromResearch() {
+    if (!currentItemId) return;
+    const btn = document.getElementById('modalCreateBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg> Creating...';
+
+    try {
+        const res = await fetch(`/api/research/items/${currentItemId}/create-post`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.error) {
+            showToast(data.error, 'error');
+            return;
+        }
+
+        // Mark item as used in local state
+        const item = allItems.find(i => i.id === currentItemId);
+        if (item) item.used = true;
+        renderItems(allItems);
+        loadResearchStats();
+        closeModal();
+
+        // Show the post created modal with virality score
+        showPostCreatedModal(data);
+    } catch (e) {
+        showToast('Failed to create post', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg> Create Post';
+    }
+}
+
+async function quickCreatePost(id) {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    try {
+        const res = await fetch(`/api/research/items/${id}/create-post`, { method: 'POST' });
+        const data = await res.json();
+
+        if (data.error) {
+            showToast(data.error, 'error');
+            return;
+        }
+
+        const item = allItems.find(i => i.id === id);
+        if (item) item.used = true;
+        renderItems(allItems);
+        loadResearchStats();
+
+        showPostCreatedModal(data);
+    } catch (e) {
+        showToast('Failed to create post', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '+ Post';
+    }
+}
+
+function showPostCreatedModal(data) {
+    const score = data.virality_score || 0;
+    const perf = data.virality_performance || 'medium';
+
+    // Score circle animation
+    const circumference = 2 * Math.PI * 52; // r=52
+    const offset = circumference - (score / 100) * circumference;
+    const circle = document.getElementById('pcScoreCircle');
+
+    // Color based on score
+    let color = '#9ca3af';
+    if (score >= 85) color = '#22c55e';
+    else if (score >= 65) color = '#3b82f6';
+    else if (score >= 40) color = '#eab308';
+    else color = '#ef4444';
+
+    circle.setAttribute('stroke', color);
+    document.getElementById('pcScoreNum').textContent = score;
+
+    // Animate after a short delay
+    setTimeout(() => {
+        circle.style.strokeDashoffset = offset;
+    }, 100);
+
+    // Performance badge
+    const perfBadge = document.getElementById('pcPerformanceBadge');
+    const perfConfig = {
+        viral: { text: 'VIRAL POTENTIAL', bg: 'bg-green-100 text-green-800' },
+        high: { text: 'HIGH POTENTIAL', bg: 'bg-blue-100 text-blue-800' },
+        medium: { text: 'MEDIUM POTENTIAL', bg: 'bg-yellow-100 text-yellow-800' },
+        low: { text: 'NEEDS WORK', bg: 'bg-red-100 text-red-800' },
+    };
+    const pc = perfConfig[perf] || perfConfig.medium;
+    perfBadge.className = `inline-block px-4 py-1.5 rounded-full text-sm font-semibold ${pc.bg}`;
+    perfBadge.textContent = pc.text;
+
+    // Breakdown bars
+    const breakdownEl = document.getElementById('pcBreakdown');
+    if (data.virality_breakdown) {
+        try {
+            const bd = typeof data.virality_breakdown === 'string' ? JSON.parse(data.virality_breakdown) : data.virality_breakdown;
+            const dims = [
+                { label: 'Hook Power', key: 'hook_power', max: 25 },
+                { label: 'Structure', key: 'structure', max: 20 },
+                { label: 'Value & Insight', key: 'value_insight', max: 20 },
+                { label: 'Engagement Trigger', key: 'engagement_trigger', max: 15 },
+                { label: 'Authenticity', key: 'authenticity', max: 10 },
+                { label: 'Relevance', key: 'relevance', max: 10 },
+            ];
+            breakdownEl.innerHTML = dims.map(d => {
+                const val = bd[d.key] || 0;
+                const pct = Math.round((val / d.max) * 100);
+                let barColor = '#9ca3af';
+                if (pct >= 80) barColor = '#22c55e';
+                else if (pct >= 50) barColor = '#3b82f6';
+                else if (pct >= 30) barColor = '#eab308';
+                else barColor = '#ef4444';
+                return `
+                <div class="flex items-center gap-3">
+                    <span class="text-xs text-gray-500 w-32 text-right">${d.label}</span>
+                    <div class="score-bar flex-1">
+                        <div class="score-bar-fill" style="width: ${pct}%; background: ${barColor};"></div>
+                    </div>
+                    <span class="text-xs font-medium text-gray-700 w-12">${val}/${d.max}</span>
+                </div>`;
+            }).join('');
+
+            // Verdict
+            document.getElementById('pcVerdict').textContent = bd.one_line_verdict || '';
+        } catch (e) {
+            breakdownEl.innerHTML = '';
+        }
+    } else {
+        breakdownEl.innerHTML = '';
+    }
+
+    // Reset circle for animation
+    circle.style.strokeDashoffset = circumference;
+
+    document.getElementById('postCreatedModal').classList.remove('hidden');
+    document.getElementById('postCreatedModal').classList.add('flex');
+
+    // Trigger animation
+    setTimeout(() => {
+        circle.style.strokeDashoffset = offset;
+    }, 100);
+}
+
+function closePostCreatedModal() {
+    document.getElementById('postCreatedModal').classList.add('hidden');
+    document.getElementById('postCreatedModal').classList.remove('flex');
+    // Reset circle
+    const circle = document.getElementById('pcScoreCircle');
+    circle.style.strokeDashoffset = 2 * Math.PI * 52;
+}
+
+// ── Actions ──
+async function toggleSave(id) {
+    try {
+        const res = await fetch(`/api/research/items/${id}/save`, { method: 'POST' });
+        const data = await res.json();
+        const item = allItems.find(i => i.id === id);
+        if (item) item.saved = data.saved;
+        renderItems(allItems.filter(i => {
+            const q = document.getElementById('searchInput').value.toLowerCase();
+            if (q && !(i.title||'').toLowerCase().includes(q) && !(i.topic||'').toLowerCase().includes(q) && !(i.content||'').toLowerCase().includes(q)) return false;
+            return true;
+        }));
+        loadResearchStats();
+        showToast(data.saved ? 'Item saved!' : 'Item unsaved', 'success');
+    } catch (e) {
+        showToast('Failed to save item', 'error');
+    }
+}
+
+async function toggleSaveFromModal() {
+    if (!currentItemId) return;
+    await toggleSave(currentItemId);
+    const item = allItems.find(i => i.id === currentItemId);
+    if (item) updateModalSaveBtn(item.saved);
+}
+
+async function toggleUsedFromModal() {
+    if (!currentItemId) return;
+    try {
+        const res = await fetch(`/api/research/items/${currentItemId}/use`, { method: 'POST' });
+        const data = await res.json();
+        const item = allItems.find(i => i.id === currentItemId);
+        if (item) item.used = data.used;
+        updateModalUseBtn(data.used);
+        document.getElementById('modalUsedBadge').className = data.used ? 'badge bg-green-50 text-green-700' : 'badge bg-gray-100 text-gray-500';
+        document.getElementById('modalUsedBadge').textContent = data.used ? 'Used' : 'Unused';
+        renderItems(allItems);
+        loadResearchStats();
+        showToast(data.used ? 'Marked as used' : 'Marked as unused', 'success');
+    } catch (e) {
+        showToast('Failed to update item', 'error');
+    }
+}
+
+async function deleteFromModal() {
+    if (!currentItemId) return;
+    if (!confirm('Delete this research item?')) return;
+    try {
+        await fetch(`/api/research/items/${currentItemId}`, { method: 'DELETE' });
+        allItems = allItems.filter(i => i.id !== currentItemId);
+        renderItems(allItems);
+        closeModal();
+        loadResearchStats();
+        showToast('Item deleted', 'success');
+    } catch (e) {
+        showToast('Failed to delete item', 'error');
+    }
+}
+
+async function runResearch() {
+    const btn = document.getElementById('runBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg> Researching...';
+
+    try {
+        const res = await fetch('/api/research/run', { method: 'POST' });
+        const data = await res.json();
+        showToast(`Research complete! ${data.items_found} items found`, 'success');
+        loadResearchStats();
+        loadResearchSources();
+        loadResearchItems();
+    } catch (e) {
+        showToast('Research failed. Check logs.', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg> Run Research';
+    }
+}
+
+async function clearOldResearch() {
+    if (!confirm('Delete research items older than 30 days? (Saved items are kept)')) return;
+    try {
+        const res = await fetch('/api/research/clear-old', { method: 'POST' });
+        const data = await res.json();
+        showToast(`Cleared ${data.deleted} old items`, 'success');
+        loadResearchStats();
+        loadResearchSources();
+        loadResearchItems();
+    } catch (e) {
+        showToast('Failed to clear old items', 'error');
+    }
+}
+
+// ── Helpers ──
+function formatSource(source) {
+    const map = {
+        'google_trends': 'Google Trends',
+        'google_trends_related': 'Google Trends',
+        'related_queries': 'Google Trends',
+        'google_news': 'Google News',
+        'reddit': 'Reddit',
+        'news': 'News',
+        'rss': 'RSS',
+        'linkedin_competitor': 'LinkedIn',
+        'linkedin_own': 'LinkedIn (My Posts)',
+        'linkedin_search': 'LinkedIn Search',
+        'manual': 'Manual',
+    };
+
+    // Handle reddit sub-sources like "reddit_r/supplements"
+    if ((source || '').startsWith('reddit_r/')) {
+        return 'Reddit r/' + source.split('/')[1];
+    }
+    // Handle rss sub-sources like "rss_Nutra Ingredients"
+    if ((source || '').startsWith('rss_')) {
+        return 'RSS: ' + source.substring(4);
+    }
+
+    return map[source] || (source || 'Unknown').charAt(0).toUpperCase() + (source || 'unknown').slice(1);
+}
+
+function getSourceClass(source) {
+    const s = source || '';
+    if (s === 'manual') return 'source-manual';
+    if (s.includes('google') || s.includes('trend') || s === 'related_queries') return 'source-google_trends';
+    if (s.startsWith('reddit') || s === 'reddit') return 'source-reddit';
+    if (s.startsWith('linkedin')) return 'source-linkedin';
+    if (s === 'news' || s.startsWith('rss') || s === 'google_news') return 'source-news';
+    return 'source-unknown';
+}
+
+function formatRegion(region) {
+    const map = {
+        'north_america': 'North America',
+        'europe': 'Europe',
+        'uk': 'UK',
+        'global': 'Global',
+    };
+    return map[region] || region || 'Unknown';
+}
+
+function getRegionClass(region) {
+    return `region-${region || 'global'}`;
+}
+
+function formatCategory(category) {
+    const map = {
+        'supplements': 'Supplements',
+        'shopify': 'Shopify',
+        'klaviyo': 'Klaviyo / Email',
+        'cro': 'CRO',
+        'amazon': 'Amazon',
+        'paid_ads': 'Paid Ads',
+        'tiktok_shop': 'TikTok Shop',
+        'dtc': 'DTC',
+        'agency': 'Agency',
+        'ecommerce_general': 'E-commerce',
+    };
+    return map[category] || category || 'General';
+}
+
+function getCategoryClass(category) {
+    return `category-${category || 'ecommerce_general'}`;
+}
+
+function escapeHtml(text) {
+    const el = document.createElement('span');
+    el.textContent = text;
+    return el.innerHTML;
+}
+
+/* ── Topic Map — 2D interactive force graph with zoom/pan ──── */
+
+const CAT_COLORS = {
+    supplements: '#FF6A00', cro: '#0066FF', shopify: '#96BF48',
+    klaviyo: '#6B21A8', amazon: '#FF9900', paid_ads: '#E4405F',
+    tiktok_shop: '#00C9B7', dtc: '#7C3AED', agency: '#1d1d1f',
+    ecommerce_general: '#6B7280', general: '#9CA3AF', unknown: '#D1D5DB',
+};
+const VEL_ICON = { rising: '\u2197', falling: '\u2198', stable: '\u2013', 'new': '\u2605' };
+
+let mapNodes = [], mapEdges = [], allMapNodes = [], allMapEdges = [];
+let mapAnim = null, simTicks = 0;
+let hoveredNode = null, selectedNode = null, dragNode = null;
+let dragStart = null, isPanning = false;
+let cam = { x: 0, y: 0, zoom: 1 };
+let mapCanvas, mapCtx, mapW, mapH, mapDpr;
+
+async function loadTopicMap() {
+    const loadingEl = document.getElementById('topic-map-loading');
+    if (loadingEl) loadingEl.style.display = 'flex';
+    try {
+        const res = await fetch('/api/research/topic-map');
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        const data = await res.json();
+        allMapNodes = data.nodes || [];
+        allMapEdges = data.edges || [];
+        populateCatFilter();
+        // Wait a frame for layout to settle before reading dimensions
+        requestAnimationFrame(() => {
+            applyMapFilter('');
+            if (loadingEl) loadingEl.style.display = 'none';
+        });
+    } catch (e) {
+        console.error('Topic map load error:', e);
+        if (loadingEl) loadingEl.textContent = 'Failed to load topic map';
+    }
+}
+
+function populateCatFilter() {
+    const sel = document.getElementById('map-cat-filter');
+    const cats = [...new Set(allMapNodes.map(n => n.category))].sort();
+    sel.innerHTML = '<option value="">All Categories</option>';
+    cats.forEach(c => {
+        const label = c.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
+        sel.innerHTML += `<option value="${c}">${label}</option>`;
+    });
+}
+
+function filterMapCategory(cat) {
+    applyMapFilter(cat);
+}
+
+function applyMapFilter(cat) {
+    const container = document.getElementById('topic-map-container');
+    mapW = container.clientWidth || 800;
+    mapH = container.clientHeight || 540;
+
+    const filtered = cat ? allMapNodes.filter(n => n.category === cat) : [...allMapNodes];
+    const ids = new Set(filtered.map(n => n.id));
+    const edges = (cat ? allMapEdges.filter(e => ids.has(e.source) && ids.has(e.target)) : [...allMapEdges]);
+
+    mapNodes = filtered.map(n => ({
+        ...n,
+        x: mapW * 0.2 + Math.random() * mapW * 0.6,
+        y: mapH * 0.2 + Math.random() * mapH * 0.6,
+        vx: 0, vy: 0,
+        r: Math.max(10, Math.min(36, 8 + (n.relevance || 0) * 28 + (n.count - 1) * 5)),
+    }));
+    mapEdges = edges;
+
+    cam = { x: 0, y: 0, zoom: 1 };
+    selectedNode = null;
+    closeDetailPanel();
+    buildLegend();
+    startSim();
+}
+
+function buildLegend() {
+    const cats = new Set(mapNodes.map(n => n.category));
+    const legend = document.getElementById('topic-map-legend');
+    legend.innerHTML = '';
+    cats.forEach(cat => {
+        const color = CAT_COLORS[cat] || '#9CA3AF';
+        const label = cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const el = document.createElement('span');
+        el.style.cssText = 'display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:2px 6px;border-radius:6px;transition:background 0.15s;';
+        el.innerHTML = `<span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0;"></span>${label}`;
+        el.onclick = () => {
+            document.getElementById('map-cat-filter').value = cat;
+            filterMapCategory(cat);
+        };
+        el.onmouseenter = () => el.style.background = 'rgba(0,0,0,0.05)';
+        el.onmouseleave = () => el.style.background = 'none';
+        legend.appendChild(el);
+    });
+}
+
+function resetMapZoom() {
+    cam = { x: 0, y: 0, zoom: 1 };
+}
+
+/* ── Simulation ────────────────────────────────────────────── */
+
+function startSim() {
+    if (mapAnim) cancelAnimationFrame(mapAnim);
+    mapCanvas = document.getElementById('topic-map-canvas');
+    mapCtx = mapCanvas.getContext('2d');
+    mapDpr = window.devicePixelRatio || 1;
+    mapCanvas.width = mapW * mapDpr;
+    mapCanvas.height = mapH * mapDpr;
+    mapCanvas.style.width = mapW + 'px';
+    mapCanvas.style.height = mapH + 'px';
+
+    simTicks = 0;
+    bindMapEvents();
+    loop();
+}
+
+function loop() {
+    simTicks++;
+    const cooling = Math.max(0.001, 1 - simTicks / 350);
+
+    // Build lookup
+    const nMap = {};
+    mapNodes.forEach(n => nMap[n.id] = n);
+
+    // Repulsion
+    for (let i = 0; i < mapNodes.length; i++) {
+        for (let j = i + 1; j < mapNodes.length; j++) {
+            const a = mapNodes[i], b = mapNodes[j];
+            let dx = b.x - a.x, dy = b.y - a.y;
+            let d2 = dx * dx + dy * dy || 1;
+            let d = Math.sqrt(d2);
+            let f = -1200 / d2 * cooling;
+            let fx = dx / d * f, fy = dy / d * f;
+            a.vx -= fx; a.vy -= fy;
+            b.vx += fx; b.vy += fy;
+        }
+    }
+
+    // Attraction along edges
+    mapEdges.forEach(e => {
+        const a = nMap[e.source], b = nMap[e.target];
+        if (!a || !b) return;
+        let dx = b.x - a.x, dy = b.y - a.y;
+        let d = Math.sqrt(dx * dx + dy * dy) || 1;
+        let f = (d - 120) * 0.006 * cooling;
+        a.vx += dx / d * f; a.vy += dy / d * f;
+        b.vx -= dx / d * f; b.vy -= dy / d * f;
+    });
+
+    // Center gravity
+    mapNodes.forEach(n => {
+        n.vx += (mapW / 2 - n.x) * 0.001 * cooling;
+        n.vy += (mapH / 2 - n.y) * 0.001 * cooling;
+    });
+
+    // Apply
+    mapNodes.forEach(n => {
+        if (n === dragNode) return;
+        n.vx *= 0.82; n.vy *= 0.82;
+        n.x += n.vx; n.y += n.vy;
+        n.x = Math.max(n.r, Math.min(mapW - n.r, n.x));
+        n.y = Math.max(n.r, Math.min(mapH - n.r, n.y));
+    });
+
+    draw();
+    if (simTicks < 350 || dragNode) mapAnim = requestAnimationFrame(loop);
+}
+
+function reheat() { simTicks = Math.min(simTicks, 280); if (!mapAnim) loop(); }
+
+/* ── Drawing ───────────────────────────────────────────────── */
+
+function screenToWorld(sx, sy) {
+    return { x: (sx - cam.x) / cam.zoom, y: (sy - cam.y) / cam.zoom };
+}
+
+function worldToScreen(wx, wy) {
+    return { x: wx * cam.zoom + cam.x, y: wy * cam.zoom + cam.y };
+}
+
+function draw() {
+    if (!mapCtx) return;
+    mapCtx.setTransform(mapDpr, 0, 0, mapDpr, 0, 0);
+    mapCtx.clearRect(0, 0, mapW, mapH);
+    mapCtx.fillStyle = '#fafafc';
+    mapCtx.fillRect(0, 0, mapW, mapH);
+
+    // Apply camera
+    mapCtx.save();
+    mapCtx.translate(cam.x, cam.y);
+    mapCtx.scale(cam.zoom, cam.zoom);
+
+    const nMap = {};
+    mapNodes.forEach(n => nMap[n.id] = n);
+
+    // Connected set for hover
+    const connectedIds = new Set();
+    if (hoveredNode) {
+        connectedIds.add(hoveredNode.id);
+        mapEdges.forEach(e => {
+            if (e.source === hoveredNode.id) connectedIds.add(e.target);
+            if (e.target === hoveredNode.id) connectedIds.add(e.source);
+        });
+    }
+
+    // Edges
+    mapEdges.forEach(e => {
+        const a = nMap[e.source], b = nMap[e.target];
+        if (!a || !b) return;
+        const hi = hoveredNode && (connectedIds.has(a.id) && connectedIds.has(b.id));
+        mapCtx.strokeStyle = hi ? 'rgba(0,0,0,0.18)' : 'rgba(0,0,0,0.035)';
+        mapCtx.lineWidth = (hi ? 2 : 1) / cam.zoom;
+        mapCtx.beginPath();
+        mapCtx.moveTo(a.x, a.y);
+        // Curved edges
+        const mx = (a.x + b.x) / 2 + (a.y - b.y) * 0.1;
+        const my = (a.y + b.y) / 2 + (b.x - a.x) * 0.1;
+        mapCtx.quadraticCurveTo(mx, my, b.x, b.y);
+        mapCtx.stroke();
+    });
+
+    // Nodes
+    mapNodes.forEach(n => {
+        const color = CAT_COLORS[n.category] || '#9CA3AF';
+        const isHov = hoveredNode === n;
+        const isSel = selectedNode === n;
+        const dimmed = hoveredNode && !connectedIds.has(n.id);
+
+        mapCtx.globalAlpha = dimmed ? 0.15 : 1;
+
+        // Shadow for hovered/selected
+        if (isHov || isSel) {
+            mapCtx.save();
+            mapCtx.shadowColor = color;
+            mapCtx.shadowBlur = isHov ? 20 : 12;
+        }
+
+        mapCtx.beginPath();
+        mapCtx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        mapCtx.fillStyle = color;
+        mapCtx.fill();
+
+        if (isHov || isSel) mapCtx.restore();
+
+        // Selection ring
+        if (isSel) {
+            mapCtx.strokeStyle = '#fff';
+            mapCtx.lineWidth = 3 / cam.zoom;
+            mapCtx.stroke();
+            mapCtx.strokeStyle = color;
+            mapCtx.lineWidth = 1.5 / cam.zoom;
+            mapCtx.stroke();
+        }
+
+        // Saved/used ring
+        if ((n.saved || n.used) && !isSel) {
+            mapCtx.strokeStyle = n.saved ? '#ff9f0a' : '#30d158';
+            mapCtx.lineWidth = 2.5 / cam.zoom;
+            mapCtx.stroke();
+        }
+
+        // Velocity indicator
+        const vel = VEL_ICON[n.velocity];
+        if (vel && n.velocity === 'rising' && !dimmed) {
+            mapCtx.fillStyle = 'rgba(255,255,255,0.9)';
+            mapCtx.font = `${Math.round(n.r * 0.7)}px sans-serif`;
+            mapCtx.textAlign = 'center';
+            mapCtx.textBaseline = 'middle';
+            mapCtx.fillText(vel, n.x, n.y);
+        }
+
+        // Label
+        const showLabel = n.r * cam.zoom > 14 || isHov || isSel;
+        if (showLabel && !dimmed) {
+            const fontSize = Math.max(9, Math.min(13, n.r * 0.65));
+            mapCtx.fillStyle = 'rgba(0,0,0,0.72)';
+            mapCtx.font = `${isHov || isSel ? '600' : '500'} ${fontSize}px Inter, system-ui, sans-serif`;
+            mapCtx.textAlign = 'center';
+            mapCtx.textBaseline = 'top';
+            const lbl = n.label.length > 30 ? n.label.slice(0, 28) + '\u2026' : n.label;
+            mapCtx.fillText(lbl, n.x, n.y + n.r + 5);
+        }
+
+        mapCtx.globalAlpha = 1;
+    });
+
+    mapCtx.restore();
+}
+
+/* ── Events ────────────────────────────────────────────────── */
+
+function hitTest(sx, sy) {
+    const w = screenToWorld(sx, sy);
+    for (let i = mapNodes.length - 1; i >= 0; i--) {
+        const n = mapNodes[i];
+        const dx = n.x - w.x, dy = n.y - w.y;
+        if (dx * dx + dy * dy < n.r * n.r) return n;
+    }
+    return null;
+}
+
+function bindMapEvents() {
+    const c = mapCanvas;
+    const container = document.getElementById('topic-map-container');
+
+    c.onmousemove = (e) => {
+        const rect = c.getBoundingClientRect();
+        const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+
+        if (dragNode) {
+            const w = screenToWorld(sx, sy);
+            dragNode.x = w.x; dragNode.y = w.y;
+            reheat();
+            draw();
+            return;
+        }
+
+        if (isPanning && dragStart) {
+            cam.x += e.clientX - dragStart.x;
+            cam.y += e.clientY - dragStart.y;
+            dragStart = { x: e.clientX, y: e.clientY };
+            draw();
+            return;
+        }
+
+        const prev = hoveredNode;
+        hoveredNode = hitTest(sx, sy);
+        container.style.cursor = hoveredNode ? 'pointer' : 'grab';
+
+        // Tooltip
+        const tooltip = document.getElementById('topic-map-tooltip');
+        if (hoveredNode) {
+            const n = hoveredNode;
+            const vel = VEL_ICON[n.velocity] || '';
+            const catLabel = n.category.replace(/_/g, ' ');
+            tooltip.innerHTML =
+                `<strong style="font-size:13px;">${n.label}</strong><br>` +
+                `<span style="opacity:0.7;">${catLabel}</span> &middot; ` +
+                `<span style="opacity:0.7;">${n.source}</span><br>` +
+                `Relevance: <strong>${(n.relevance * 100).toFixed(0)}%</strong> ${vel}<br>` +
+                (n.count > 1 ? `Seen ${n.count}x &middot; ` : '') +
+                (n.used ? '<span style="color:#30d158;">Used</span> ' : '') +
+                (n.saved ? '<span style="color:#ff9f0a;">Saved</span>' : '');
+            tooltip.style.display = 'block';
+            let tx = sx + 16, ty = sy - 12;
+            if (tx + 240 > mapW) tx = sx - 250;
+            if (ty < 10) ty = sy + 20;
+            tooltip.style.left = tx + 'px';
+            tooltip.style.top = ty + 'px';
+        } else {
+            tooltip.style.display = 'none';
+        }
+
+        if (prev !== hoveredNode) draw();
+    };
+
+    c.onmousedown = (e) => {
+        const rect = c.getBoundingClientRect();
+        const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+        const node = hitTest(sx, sy);
+
+        if (node) {
+            dragNode = node;
+            container.style.cursor = 'grabbing';
+        } else {
+            isPanning = true;
+            dragStart = { x: e.clientX, y: e.clientY };
+            container.style.cursor = 'grabbing';
+        }
+    };
+
+    c.onmouseup = (e) => {
+        if (dragNode) {
+            // If barely moved, treat as click → select
+            const rect = c.getBoundingClientRect();
+            const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+            const hit = hitTest(sx, sy);
+            if (hit === dragNode) selectNode(dragNode);
+            dragNode = null;
+        }
+        isPanning = false;
+        dragStart = null;
+        container.style.cursor = hoveredNode ? 'pointer' : 'grab';
+    };
+
+    c.onmouseleave = () => {
+        hoveredNode = null; dragNode = null; isPanning = false; dragStart = null;
+        document.getElementById('topic-map-tooltip').style.display = 'none';
+        draw();
+    };
+
+    // Zoom
+    c.onwheel = (e) => {
+        e.preventDefault();
+        const rect = c.getBoundingClientRect();
+        const sx = e.clientX - rect.left, sy = e.clientY - rect.top;
+        const delta = e.deltaY > 0 ? 0.9 : 1.1;
+        const newZoom = Math.max(0.3, Math.min(4, cam.zoom * delta));
+        // Zoom toward cursor
+        cam.x = sx - (sx - cam.x) * (newZoom / cam.zoom);
+        cam.y = sy - (sy - cam.y) * (newZoom / cam.zoom);
+        cam.zoom = newZoom;
+        draw();
+    };
+}
+
+/* ── Detail Panel ──────────────────────────────────────────── */
+
+let selectedNodeData = null;
+
+function selectNode(n) {
+    selectedNode = n;
+    selectedNodeData = n;
+    const panel = document.getElementById('map-detail-panel');
+    document.getElementById('detail-title').textContent = n.label;
+    const catLabel = n.category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    const vel = VEL_ICON[n.velocity] || '';
+    const velLabel = n.velocity ? n.velocity.charAt(0).toUpperCase() + n.velocity.slice(1) : '';
+    document.getElementById('detail-body').innerHTML =
+        `<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-bottom:8px;">` +
+        `<div><span style="font-size:11px;color:var(--text-muted);">Category</span><br><strong>${catLabel}</strong></div>` +
+        `<div><span style="font-size:11px;color:var(--text-muted);">Source</span><br><strong>${n.source}</strong></div>` +
+        `<div><span style="font-size:11px;color:var(--text-muted);">Relevance</span><br><strong>${(n.relevance * 100).toFixed(0)}%</strong></div>` +
+        `<div><span style="font-size:11px;color:var(--text-muted);">Velocity</span><br><strong>${vel} ${velLabel}</strong></div>` +
+        `</div>` +
+        `<div style="font-size:11px; color:var(--text-muted);">` +
+        (n.count > 1 ? `Seen ${n.count} times &middot; ` : '') +
+        (n.used ? '<span style="color:#30d158;">Already used</span> &middot; ' : '') +
+        (n.saved ? '<span style="color:#ff9f0a;">Saved</span>' : '') +
+        `</div>`;
+
+    // Connected topics
+    const connected = [];
+    mapEdges.forEach(e => {
+        if (e.source === n.id) connected.push(e.target);
+        if (e.target === n.id) connected.push(e.source);
+    });
+    if (connected.length) {
+        const nMap = {};
+        mapNodes.forEach(nd => nMap[nd.id] = nd);
+        const tags = connected.slice(0, 6).map(id => {
+            const nd = nMap[id];
+            if (!nd) return '';
+            const col = CAT_COLORS[nd.category] || '#9CA3AF';
+            return `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;background:${col}18;color:${col};border:1px solid ${col}30;cursor:pointer;" onclick="selectNodeById('${id}')">${nd.label.slice(0,25)}</span>`;
+        }).join(' ');
+        document.getElementById('detail-body').innerHTML += `<div style="margin-top:8px;"><span style="font-size:11px;color:var(--text-muted);">Connected topics</span><div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${tags}</div></div>`;
+    }
+
+    document.getElementById('detail-save-btn').textContent = n.saved ? 'Unsave' : 'Save';
+    panel.style.display = 'block';
+    draw();
+}
+
+function selectNodeById(id) {
+    const n = mapNodes.find(nd => nd.id === id);
+    if (n) selectNode(n);
+}
+
+function closeDetailPanel() {
+    selectedNode = null;
+    selectedNodeData = null;
+    document.getElementById('map-detail-panel').style.display = 'none';
+    draw();
+}
+
+async function createPostFromSelected() {
+    if (!selectedNodeData) return;
+    // Find the research item by topic to get its ID
+    try {
+        const res = await fetch(`/api/research/items?limit=1&search=${encodeURIComponent(selectedNodeData.label)}`);
+        const items = await res.json();
+        if (items.length) {
+            const postRes = await fetch(`/api/research/items/${items[0].id}/create-post`, { method: 'POST' });
+            if (postRes.ok) { showToast('Post created from topic!'); }
+            else { showToast('Failed to create post', 'error'); }
+        } else {
+            showToast('Research item not found', 'error');
+        }
+    } catch (e) { showToast('Error creating post', 'error'); }
+}
+
+async function toggleSaveSelected() {
+    if (!selectedNodeData) return;
+    try {
+        const res = await fetch(`/api/research/items?limit=1&search=${encodeURIComponent(selectedNodeData.label)}`);
+        const items = await res.json();
+        if (items.length) {
+            await fetch(`/api/research/items/${items[0].id}/save`, { method: 'POST' });
+            selectedNodeData.saved = !selectedNodeData.saved;
+            document.getElementById('detail-save-btn').textContent = selectedNodeData.saved ? 'Unsave' : 'Save';
+            showToast(selectedNodeData.saved ? 'Saved!' : 'Unsaved');
+            draw();
+        }
+    } catch (e) { showToast('Error', 'error'); }
+}
+</script>
+{% endblock %}

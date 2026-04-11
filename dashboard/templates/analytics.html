@@ -1,0 +1,534 @@
+{% extends "base.html" %}
+{% block page_title %}Analytics{% endblock %}
+
+{% block content %}
+
+{% if auth_status and auth_status.authenticated and not auth_status.has_read_scope %}
+<div class="glass-card p-4 mb-8" style="border-left: 3px solid var(--accent);">
+    <div class="flex items-center gap-3">
+        <svg class="w-4 h-4 flex-shrink-0" style="color: var(--accent);" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        <p class="text-xs" style="color: var(--text-secondary);">Import History &amp; Refresh need <strong>r_member_social</strong>. Request <strong>"Community Management API"</strong> in your <a href="https://www.linkedin.com/developers/apps" target="_blank" class="underline" style="color: var(--accent);">LinkedIn Developer Portal</a>, then reconnect on <a href="/settings" class="underline" style="color: var(--accent);">Settings</a>.</p>
+    </div>
+</div>
+{% endif %}
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-8 flex-wrap gap-5">
+    <div class="flex items-center gap-3">
+        <h2 class="section-heading">Analytics</h2>
+        <span id="profile-status" class="text-xs" style="color: var(--text-muted);"></span>
+    </div>
+    <div class="flex gap-3">
+        <button onclick="refreshEngagement()" id="refresh-btn" class="btn btn-primary btn-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+            Refresh Engagement
+        </button>
+        <button onclick="scrapeMyPosts()" id="scrape-btn" class="btn btn-ghost btn-sm">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+            Scrape My Posts
+        </button>
+    </div>
+</div>
+
+<!-- My LinkedIn Profile Stats (the REAL data) -->
+<div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-5 mb-8" id="profile-stats-section" style="display:none;">
+    <div class="glass-card stat-card text-center fade-in-up stagger-1">
+        <p class="stat-label">Posts</p>
+        <p class="stat-value" id="ps-total">0</p>
+    </div>
+    <div class="glass-card stat-card text-center fade-in-up stagger-2">
+        <p class="stat-label">Likes</p>
+        <p class="stat-value" id="ps-likes">0</p>
+        <p class="stat-subtext" id="ps-avg-likes"></p>
+    </div>
+    <div class="glass-card stat-card text-center fade-in-up stagger-3">
+        <p class="stat-label">Comments</p>
+        <p class="stat-value" id="ps-comments">0</p>
+        <p class="stat-subtext" id="ps-avg-comments"></p>
+    </div>
+    <div class="glass-card stat-card text-center fade-in-up stagger-4">
+        <p class="stat-label">Shares</p>
+        <p class="stat-value" id="ps-shares">0</p>
+        <p class="stat-subtext" id="ps-avg-shares"></p>
+    </div>
+    <div class="glass-card stat-card text-center fade-in-up stagger-5">
+        <p class="stat-label">Avg Eng</p>
+        <p class="stat-value" id="ps-avg-eng">0</p>
+    </div>
+    <div class="glass-card stat-card text-center fade-in-up stagger-6">
+        <p class="stat-label">Frequency</p>
+        <p class="stat-value" id="ps-frequency">--</p>
+    </div>
+    <div class="glass-card stat-card text-center fade-in-up stagger-7">
+        <p class="stat-label">Best Score</p>
+        <p class="stat-value" id="ps-best-score">0</p>
+    </div>
+</div>
+
+<!-- Row: Timeline + Next Posting Slots -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
+    <div class="glass-card p-8 lg:col-span-2" id="profile-chart-section" style="display:none;">
+        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Posting Timeline</h3>
+        <div style="height:220px"><canvas id="profile-timeline-chart"></canvas></div>
+    </div>
+    <div class="glass-card p-8">
+        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">Next Posting Slots</h3>
+        <div id="next-slots-container" class="space-y-2">
+            <p style="color: var(--text-muted);" class="text-sm">Loading...</p>
+        </div>
+        <div class="mt-4 pt-3" style="border-top: 1px solid var(--border-primary);">
+            <h4 class="stat-label" style="margin-bottom: 8px;">Daily Commenting</h4>
+            <div id="commenting-stats" class="text-sm" style="color: var(--text-secondary);">
+                <p style="color: var(--text-muted);" class="text-xs">Loading...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Row: Template Performance + Best Posting Times -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
+    <div class="glass-card p-8">
+        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Template Performance</h3>
+        <div style="height:220px"><canvas id="template-chart"></canvas></div>
+    </div>
+    <div class="glass-card p-8">
+        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Best Posting Times</h3>
+        <div id="heatmap-container" class="overflow-x-auto"></div>
+    </div>
+</div>
+
+<!-- Hook Library Stats -->
+<div class="glass-card p-8 mb-8" id="hooks-stats-card">
+    <div class="flex items-center justify-between mb-4">
+        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary);">Hook Library</h3>
+        <button onclick="extractHooks()" id="extract-hooks-btn" class="btn btn-ghost btn-sm">Extract New Hooks</button>
+    </div>
+    <div id="hooks-summary" class="grid grid-cols-2 sm:grid-cols-4 gap-5">
+        <p style="color: var(--text-muted);" class="text-sm col-span-4">Loading...</p>
+    </div>
+</div>
+
+<!-- My LinkedIn Posts (the actual engagement data) -->
+<div class="glass-card overflow-hidden" id="my-posts-section">
+    <div class="px-8 py-6" style="border-bottom: 1px solid var(--border-primary); display: flex; align-items: center; justify-content: space-between;">
+        <div>
+            <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary);">My LinkedIn Posts</h3>
+            <p class="stat-subtext" style="margin-top: 4px;">Ranked by engagement — click for details</p>
+        </div>
+        <div class="flex gap-3 items-center">
+            <select id="my-posts-sort" onchange="loadMyPosts(0)" class="input" style="width: auto; padding: 6px 12px; font-size: 13px;">
+                <option value="engagement">Top Engagement</option>
+                <option value="date">Most Recent</option>
+            </select>
+            <span id="my-posts-count" class="text-xs" style="color: var(--text-muted);"></span>
+        </div>
+    </div>
+    <div id="my-posts-container">
+        <div class="px-8 py-10 text-center text-sm" style="color: var(--text-muted);">
+            Set your profile URL in <a href="/settings" class="underline" style="color: var(--accent);">Settings</a> and click "Scrape My Posts" to import
+        </div>
+    </div>
+    <div id="my-posts-pagination" class="px-8 py-4 flex items-center justify-between" style="border-top: 1px solid var(--border-primary); display:none;">
+        <button onclick="myPostsPagePrev()" id="my-posts-prev-btn" class="btn btn-ghost btn-sm">Previous</button>
+        <div id="my-posts-page-numbers" class="flex items-center gap-1"></div>
+        <button onclick="myPostsPageNext()" id="my-posts-next-btn" class="btn btn-ghost btn-sm">Next</button>
+    </div>
+</div>
+
+<!-- Post detail modal -->
+<div id="post-detail-modal" class="modal-overlay hidden" style="display:none;">
+    <div class="modal-content fade-in">
+        <div class="p-8">
+            <div class="flex items-center justify-between mb-6">
+                <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary);">Post Details</h3>
+                <button onclick="document.getElementById('post-detail-modal').classList.add('hidden'); document.getElementById('post-detail-modal').style.display='none';" class="w-8 h-8 flex items-center justify-center" style="border-radius: var(--radius-sm); border: none; background: none; cursor: pointer; color: var(--text-muted);">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <div class="flex gap-5 mb-6">
+                <div class="flex-1 grid grid-cols-3 gap-5">
+                    <div class="glass-card stat-card text-center"><p class="stat-value" id="detail-likes">0</p><p class="stat-label" style="margin-top: 4px;">Likes</p></div>
+                    <div class="glass-card stat-card text-center"><p class="stat-value" id="detail-comments">0</p><p class="stat-label" style="margin-top: 4px;">Comments</p></div>
+                    <div class="glass-card stat-card text-center"><p class="stat-value" id="detail-shares">0</p><p class="stat-label" style="margin-top: 4px;">Shares</p></div>
+                </div>
+            </div>
+            <div class="text-xs mb-2" style="color: var(--text-muted);" id="detail-date"></div>
+            <div class="post-content p-6" style="background: var(--surface-secondary); border-radius: var(--radius-lg); max-height: 24rem; overflow-y: auto; white-space: pre-wrap;" id="detail-content"></div>
+            <div class="flex gap-3 mt-6 justify-end">
+                <button onclick="copyPostContent()" class="btn btn-ghost btn-sm">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    Copy
+                </button>
+                <button onclick="document.getElementById('post-detail-modal').classList.add('hidden'); document.getElementById('post-detail-modal').style.display='none';" class="btn btn-primary btn-sm">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script>
+const PAGE_SIZE = 10;
+let myPostsPage = 0, myPostsTotal = 0, myPostsData = [];
+let profileTimelineChart = null, templateChart = null;
+
+const C = {
+    blue: '#3b82f6', blueL: 'rgba(59,130,246,0.08)',
+    green: '#10b981', greenL: 'rgba(16,185,129,0.08)',
+    purple: '#8b5cf6', purpleL: 'rgba(139,92,246,0.08)',
+    orange: '#f97316', gray: '#6b7280',
+};
+
+const chartDefaults = {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position:'top', labels: { boxWidth:8, usePointStyle:true, pointStyle:'circle', padding:16, font:{size:11} } } },
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    Promise.all([loadProfileStats(), loadMyPosts(), loadProfileTimeline(), loadTemplates(), loadBestTimes(), loadNextSlots(), loadCommentingStats(), loadHooksStats()]);
+});
+
+/* ── Profile Stats ───────────────────────── */
+
+async function loadProfileStats() {
+    try {
+        const d = await (await fetch('/api/profile/stats')).json();
+        if (!d.total_posts) {
+            document.getElementById('profile-stats-section').style.display = 'none';
+            document.getElementById('profile-status').textContent = 'No posts scraped yet — click Scrape My Posts';
+            return;
+        }
+        document.getElementById('profile-stats-section').style.display = '';
+        document.getElementById('profile-status').textContent = `${d.total_posts} posts tracked`;
+        document.getElementById('ps-total').textContent = d.total_posts;
+        document.getElementById('ps-likes').textContent = fmtN(d.total_likes);
+        document.getElementById('ps-comments').textContent = fmtN(d.total_comments);
+        document.getElementById('ps-shares').textContent = fmtN(d.total_shares);
+        document.getElementById('ps-avg-likes').textContent = `avg ${d.avg_likes}/post`;
+        document.getElementById('ps-avg-comments').textContent = `avg ${d.avg_comments}/post`;
+        document.getElementById('ps-avg-shares').textContent = `avg ${d.avg_shares}/post`;
+        document.getElementById('ps-avg-eng').textContent = Math.round(d.avg_likes + d.avg_comments * 3 + d.avg_shares * 5);
+        document.getElementById('ps-frequency').textContent = d.posting_frequency || '--';
+        if (d.top_post) {
+            document.getElementById('ps-best-score').textContent = d.top_post.likes + d.top_post.comments * 3 + d.top_post.shares * 5;
+        }
+    } catch (e) { console.error(e); }
+}
+
+/* ── Profile Timeline Chart ────────────── */
+
+async function loadProfileTimeline() {
+    try {
+        const data = await (await fetch('/api/profile/timeline')).json();
+        if (!data.length) { document.getElementById('profile-chart-section').style.display = 'none'; return; }
+        document.getElementById('profile-chart-section').style.display = '';
+        const labels = data.map(d => new Date(d.week + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }));
+        const ctx = document.getElementById('profile-timeline-chart').getContext('2d');
+        if (profileTimelineChart) profileTimelineChart.destroy();
+        profileTimelineChart = new Chart(ctx, {
+            type: 'bar', data: { labels, datasets: [
+                { label: 'Posts', data: data.map(d => d.posts), backgroundColor: 'rgba(99,102,241,0.15)', borderColor: '#6366f1', borderWidth: 1.5, borderRadius: 6, yAxisID: 'y' },
+                { label: 'Likes', data: data.map(d => d.likes), type: 'line', borderColor: C.blue, backgroundColor: C.blueL, fill: true, tension: .3, borderWidth: 2, pointRadius: 2, yAxisID: 'y1' },
+                { label: 'Comments', data: data.map(d => d.comments), type: 'line', borderColor: C.green, backgroundColor: C.greenL, fill: true, tension: .3, borderWidth: 2, pointRadius: 2, yAxisID: 'y1' },
+            ]}, options: { ...chartDefaults, interaction: { intersect: false, mode: 'index' },
+            scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, maxRotation: 0, maxTicksLimit: 12 } },
+                y: { beginAtZero: true, position: 'left', grid: { color: 'rgba(0,0,0,0.03)' }, title: { display: true, text: 'Posts', font: { size: 10 } } },
+                y1: { beginAtZero: true, position: 'right', grid: { display: false }, title: { display: true, text: 'Engagement', font: { size: 10 } } } } }
+        });
+    } catch (e) { console.error(e); }
+}
+
+/* ── Template Performance Chart ────────── */
+
+async function loadTemplates() {
+    try {
+        const data = await (await fetch('/api/analytics/templates')).json();
+        if (!data.length) return;
+        const ctx = document.getElementById('template-chart').getContext('2d');
+        if (templateChart) templateChart.destroy();
+        templateChart = new Chart(ctx, { type: 'bar', data: { labels: data.map(d => trunc(d.template_name, 16)), datasets: [
+            { label: 'Avg Likes', data: data.map(d => d.avg_likes), backgroundColor: 'rgba(59,130,246,0.7)', borderRadius: 6 },
+            { label: 'Avg Comments', data: data.map(d => d.avg_comments), backgroundColor: 'rgba(16,185,129,0.7)', borderRadius: 6 },
+        ]}, options: { ...chartDefaults, scales: { x: { grid: { display: false }, ticks: { maxRotation: 45, font: { size: 10 } } }, y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.03)' }, ticks: { font: { size: 10 } } } } } });
+    } catch (e) { console.error(e); }
+}
+
+/* ── Best Posting Times Heatmap ────────── */
+
+async function loadBestTimes() {
+    try {
+        const data = await (await fetch('/api/analytics/best-times')).json();
+        const el = document.getElementById('heatmap-container');
+        if (!data.length) { el.innerHTML = '<p class="text-sm text-center py-10" style="color: var(--text-muted);">No posting data yet</p>'; return; }
+        const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const dm = { Monday: 0, Tuesday: 1, Wednesday: 2, Thursday: 3, Friday: 4, Saturday: 5, Sunday: 6 };
+        const lk = {}; let mx = 1;
+        data.forEach(d => { lk[`${dm[d.day_of_week]}-${d.hour}`] = d; if (d.avg_engagement > mx) mx = d.avg_engagement; });
+        let h = '<table class="w-full text-xs"><thead><tr><th class="py-1.5 px-1"></th>';
+        for (let i = 6; i <= 22; i++) h += `<th class="py-1.5 px-0.5" style="color: var(--text-muted); font-weight: 400;">${i}</th>`;
+        h += '</tr></thead><tbody>';
+        days.forEach((day, di) => {
+            h += `<tr><td class="py-1.5 px-2 font-medium" style="color: var(--text-secondary);">${day}</td>`;
+            for (let i = 6; i <= 22; i++) {
+                const d = lk[`${di}-${i}`];
+                if (d) { const pct = d.avg_engagement / mx * 100; const bg = pct > 66 ? 'background:var(--success);color:white;' : pct > 33 ? 'background:rgba(48,209,88,0.3);color:var(--text-primary);' : 'background:rgba(48,209,88,0.1);color:var(--text-secondary);';
+                    h += `<td class="py-1.5 px-0.5 text-center cursor-default" style="border-radius:var(--radius-sm);${bg}" title="${d.day_of_week} ${i}:00 - Avg: ${d.avg_engagement} (${d.posts_count} posts)">${d.posts_count}</td>`;
+                } else h += `<td class="py-1.5 px-0.5 text-center" style="color: var(--text-muted);">-</td>`;
+            }
+            h += '</tr>';
+        });
+        h += '</tbody></table>';
+        el.innerHTML = h;
+    } catch (e) { console.error(e); }
+}
+
+/* ── Next Posting Slots ────────────────── */
+
+async function loadNextSlots() {
+    try {
+        const d = await (await fetch('/api/next-slots')).json();
+        const el = document.getElementById('next-slots-container');
+        if (!d.next_slots.length) { el.innerHTML = '<p class="text-xs" style="color: var(--text-muted);">No slots configured</p>'; return; }
+        el.innerHTML = d.next_slots.map(s => {
+            const dt = new Date(s.datetime);
+            const time = dt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            const isToday = dt.toDateString() === new Date().toDateString();
+            const isTomorrow = dt.toDateString() === new Date(Date.now() + 86400000).toDateString();
+            const dayLabel = isToday ? 'Today' : isTomorrow ? 'Tomorrow' : s.day_name;
+            return `<div class="flex items-center gap-3 py-1.5">
+                <div class="w-2 h-2 rounded-full" style="background: ${isToday ? 'var(--success)' : 'var(--text-muted)'}; ${isToday ? 'animation: pulse 2s infinite;' : ''}"></div>
+                <span class="text-sm font-medium" style="color: var(--text-primary);">${dayLabel}</span>
+                <span class="text-sm" style="color: var(--text-secondary);">${time}</span>
+                <span class="text-[10px] ml-auto" style="color: var(--text-muted);">${d.timezone}</span>
+            </div>`;
+        }).join('');
+    } catch (e) { console.error(e); }
+}
+
+/* ── Commenting Stats ──────────────────── */
+
+async function loadCommentingStats() {
+    try {
+        const d = await (await fetch('/api/commenting/targets')).json();
+        const stats = d.stats;
+        const el = document.getElementById('commenting-stats');
+        const pct = Math.round((stats.today / stats.daily_target) * 100);
+        const barColor = pct >= 80 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)';
+        el.innerHTML = `
+            <div class="flex items-center justify-between text-xs mb-1">
+                <span style="color: var(--text-secondary);">${stats.today}/${stats.daily_target} today</span>
+                <span style="color: var(--text-muted);">${stats.this_week} this week</span>
+            </div>
+            <div class="w-full rounded-full h-2" style="background: var(--border-primary);">
+                <div class="h-2 rounded-full transition-all" style="width:${Math.min(100, pct)}%; background: ${barColor};"></div>
+            </div>
+            <a href="/api/commenting/targets" class="mt-1 inline-block" style="font-size: 11px; color: var(--accent);">View targets</a>
+        `;
+    } catch (e) { console.error(e); }
+}
+
+/* ── Hook Library Stats ────────────────── */
+
+async function loadHooksStats() {
+    try {
+        const d = await (await fetch('/api/hooks')).json();
+        const hooks = d.hooks;
+        const el = document.getElementById('hooks-summary');
+        const own = hooks.filter(h => h.source === 'own').length;
+        const comp = hooks.filter(h => h.source === 'competitor').length;
+        const manual = hooks.filter(h => h.source === 'manual').length;
+        const topHook = hooks.length ? hooks[0] : null;
+        el.innerHTML = `
+            <div class="glass-card stat-card text-center">
+                <p class="stat-value">${d.total}</p>
+                <p class="stat-label" style="margin-top: 4px;">Total Hooks</p>
+            </div>
+            <div class="glass-card stat-card text-center">
+                <p class="stat-value">${own}</p>
+                <p class="stat-label" style="margin-top: 4px;">From Own Posts</p>
+            </div>
+            <div class="glass-card stat-card text-center">
+                <p class="stat-value">${comp}</p>
+                <p class="stat-label" style="margin-top: 4px;">From Competitors</p>
+            </div>
+            <div class="glass-card stat-card text-center">
+                <p class="stat-value">${manual}</p>
+                <p class="stat-label" style="margin-top: 4px;">Manual</p>
+            </div>
+        `;
+        if (topHook) {
+            el.innerHTML += `<div class="col-span-2 sm:col-span-4 mt-2 glass-card p-6">
+                <p class="stat-label" style="margin-bottom: 4px;">Top Hook (score: ${topHook.engagement_score})</p>
+                <p class="text-sm italic" style="color: var(--text-secondary);">"${topHook.text.substring(0, 150)}${topHook.text.length > 150 ? '...' : ''}"</p>
+            </div>`;
+        }
+    } catch (e) { console.error(e); }
+}
+
+async function extractHooks() {
+    const btn = document.getElementById('extract-hooks-btn');
+    btn.textContent = 'Extracting...'; btn.disabled = true;
+    try {
+        const d = await (await fetch('/api/hooks/extract', { method: 'POST' })).json();
+        showToast(`Extracted ${d.own_added} own + ${d.competitor_added} competitor hooks (${d.total_hooks} total)`);
+        loadHooksStats();
+    } catch (e) { showToast('Extraction failed', 'error'); }
+    finally { btn.textContent = 'Extract New Hooks'; btn.disabled = false; }
+}
+
+/* ── My Posts List ──────────────────────── */
+
+async function loadMyPosts(page) {
+    if (page !== undefined) myPostsPage = page;
+    const offset = myPostsPage * PAGE_SIZE;
+    try {
+        const sort = document.getElementById('my-posts-sort')?.value || 'engagement';
+        const resp = await (await fetch(`/api/profile/posts?sort=${sort}&limit=${PAGE_SIZE}&offset=${offset}`)).json();
+        const data = resp.items;
+        myPostsTotal = resp.total;
+        myPostsData = data;
+        const container = document.getElementById('my-posts-container');
+        const countEl = document.getElementById('my-posts-count');
+
+        if (!data.length && myPostsPage === 0) {
+            container.innerHTML = '<div class="px-8 py-10 text-center text-sm" style="color: var(--text-muted);">Set your profile URL in <a href="/settings" class="underline" style="color: var(--accent);">Settings</a> and click "Scrape My Posts" to import</div>';
+            countEl.textContent = '';
+            updateMyPostsPagination();
+            return;
+        }
+
+        countEl.textContent = `${myPostsTotal} posts`;
+        const maxScore = Math.max(...data.map(p => p.engagement_score), 1);
+        const rankOffset = myPostsPage * PAGE_SIZE;
+
+        container.innerHTML = '<div>' + data.map((p, i) => {
+            const rank = rankOffset + i;
+            const dt = p.post_date ? new Date(p.post_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '--';
+            const engClass = p.engagement_score >= 50 ? 'score-viral' : p.engagement_score >= 20 ? 'score-high' : '';
+            const barWidth = Math.min(100, Math.round(p.engagement_score / maxScore * 100));
+            const badges = [];
+            if (p.hook_style) badges.push(`<span class="badge badge-info">${p.hook_style}</span>`);
+            if (p.content_format) badges.push(`<span class="badge badge-neutral">${p.content_format}</span>`);
+            const linkBtn = p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" style="color: var(--accent);" onclick="event.stopPropagation()" title="View on LinkedIn"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>` : '';
+
+            return `<div class="px-8 py-4 transition-colors cursor-pointer flex items-center gap-5" style="border-bottom: 1px solid var(--border-subtle);" onmouseover="this.style.background='var(--surface-secondary)'" onmouseout="this.style.background=''" onclick="showMyPostDetail(${i})">
+                <div class="w-8 text-center">
+                    <span class="text-xs font-bold" style="color: ${rank < 3 ? 'var(--warning)' : 'var(--text-muted)'};">#${rank + 1}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm truncate" style="color: var(--text-primary);">${esc(p.content.substring(0, 150))}</p>
+                    <div class="flex items-center gap-2 mt-1 flex-wrap">
+                        <span style="font-size: 11px; color: var(--text-muted);">${dt}</span>
+                        ${badges.join('')}
+                        <div class="flex-1 max-w-[100px] rounded-full h-1.5" style="background: var(--border-primary);"><div class="h-1.5 rounded-full" style="width:${barWidth}%; background: var(--accent);"></div></div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 shrink-0">
+                    <div class="text-center"><p class="text-sm font-semibold" style="color: var(--text-primary);">${p.likes}</p><p style="font-size: 10px; color: var(--text-muted);">Likes</p></div>
+                    <div class="text-center"><p class="text-sm font-semibold" style="color: var(--text-primary);">${p.comments}</p><p style="font-size: 10px; color: var(--text-muted);">Cmts</p></div>
+                    <div class="text-center"><p class="text-sm font-semibold" style="color: var(--text-primary);">${p.shares}</p><p style="font-size: 10px; color: var(--text-muted);">Shares</p></div>
+                    <div class="text-center w-10"><p class="text-sm font-bold ${engClass}" style="${!engClass ? 'color: var(--text-secondary);' : ''}">${p.engagement_score}</p><p style="font-size: 10px; color: var(--text-muted);">Score</p></div>
+                    ${linkBtn}
+                </div>
+            </div>`;
+        }).join('') + '</div>';
+        updateMyPostsPagination();
+    } catch (e) { console.error('Failed to load profile posts:', e); }
+}
+
+function updateMyPostsPagination() {
+    const totalPages = Math.ceil(myPostsTotal / PAGE_SIZE);
+    const pag = document.getElementById('my-posts-pagination');
+    if (totalPages <= 1) { pag.style.display = 'none'; return; }
+    pag.style.display = '';
+    document.getElementById('my-posts-prev-btn').disabled = myPostsPage === 0;
+    document.getElementById('my-posts-next-btn').disabled = myPostsPage >= totalPages - 1;
+    document.getElementById('my-posts-page-numbers').innerHTML = buildPageNumbers(myPostsPage, totalPages, 'loadMyPosts');
+}
+
+function myPostsPagePrev() { if (myPostsPage > 0) loadMyPosts(myPostsPage - 1); }
+function myPostsPageNext() { const tp = Math.ceil(myPostsTotal / PAGE_SIZE); if (myPostsPage < tp - 1) loadMyPosts(myPostsPage + 1); }
+
+/* ── Post Detail Modal ─────────────────── */
+
+function showMyPostDetail(index) {
+    const p = myPostsData[index];
+    if (!p) return;
+    document.getElementById('detail-likes').textContent = p.likes;
+    document.getElementById('detail-comments').textContent = p.comments;
+    document.getElementById('detail-shares').textContent = p.shares;
+    document.getElementById('detail-content').textContent = p.content;
+    const dateStr = p.post_date ? `Posted ${new Date(p.post_date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}` : '';
+    const analysis = [];
+    if (p.hook_style) analysis.push(`Hook: ${p.hook_style}`);
+    if (p.content_format) analysis.push(`Format: ${p.content_format}`);
+    if (p.topic) analysis.push(`Topic: ${p.topic}`);
+    document.getElementById('detail-date').textContent = [dateStr, `Score: ${p.engagement_score}`, ...analysis].filter(Boolean).join(' \u00b7 ');
+    const contentEl = document.getElementById('detail-content');
+    if (p.key_takeaway || p.why_it_works) {
+        let extra = '\n\n\u2501\u2501\u2501 AI Analysis \u2501\u2501\u2501';
+        if (p.key_takeaway) extra += `\nKey Takeaway: ${p.key_takeaway}`;
+        if (p.why_it_works) extra += `\nWhy It Works: ${p.why_it_works}`;
+        contentEl.textContent += extra;
+    }
+    const modal = document.getElementById('post-detail-modal');
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+}
+
+function copyPostContent() {
+    const content = document.getElementById('detail-content').textContent;
+    navigator.clipboard.writeText(content).then(() => showToast('Content copied!')).catch(() => showToast('Copy failed', 'error'));
+}
+
+/* ── Actions ───────────────────────────── */
+
+async function refreshEngagement() {
+    const b = document.getElementById('refresh-btn'); b.disabled = true;
+    b.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Refreshing...';
+    try { const d = await (await fetch('/api/analytics/refresh-engagement', { method: 'POST' })).json(); showToast(`Updated ${d.posts_updated} posts`); loadProfileStats(); }
+    catch (e) { showToast('Refresh failed', 'error'); }
+    finally { b.disabled = false; b.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Refresh Engagement'; }
+}
+
+async function scrapeMyPosts() {
+    const btn = document.getElementById('scrape-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Scraping (1-2 min)...';
+    try {
+        const res = await fetch('/api/profile/scrape', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            let msg = `Scraped ${data.new_posts} new, ${data.updated_posts} updated`;
+            if (data.analyzed) msg += `, ${data.analyzed} AI-analyzed`;
+            showToast(msg);
+            loadProfileStats(); loadMyPosts(); loadProfileTimeline();
+        } else { showToast(data.error || 'Scrape failed', 'error'); }
+    } catch (e) { showToast('Scrape failed', 'error'); }
+    finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg> Scrape My Posts';
+    }
+}
+
+/* ── Utilities ─────────────────────────── */
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { const m = document.getElementById('post-detail-modal'); m?.classList.add('hidden'); m.style.display='none'; } });
+document.getElementById('post-detail-modal')?.addEventListener('click', e => { if (e.target === e.currentTarget) { e.target.classList.add('hidden'); e.target.style.display='none'; } });
+
+function buildPageNumbers(current, total, fnName) {
+    let html = '', last = -1;
+    const show = [];
+    for (let i = 0; i < total; i++) { if (i === 0 || i === total - 1 || (i >= current - 1 && i <= current + 1)) show.push(i); }
+    show.forEach(pg => {
+        if (last >= 0 && pg - last > 1) html += '<span class="text-xs px-1" style="color: var(--text-muted);">...</span>';
+        html += `<button onclick="${fnName}(${pg})" class="w-7 h-7 text-xs font-medium transition-all" style="border-radius: var(--radius-sm); border: none; cursor: pointer; ${pg === current ? 'background: var(--text-primary); color: var(--text-inverse); box-shadow: var(--shadow-sm);' : 'background: none; color: var(--text-secondary);'}">${pg + 1}</button>`;
+        last = pg;
+    });
+    return html;
+}
+
+function fmtN(n) { if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'; if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'; return n?.toString() || '0'; }
+function trunc(s, l) { return !s ? '--' : s.length > l ? s.slice(0, l) + '...' : s; }
+function esc(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+</script>
+{% endblock %}

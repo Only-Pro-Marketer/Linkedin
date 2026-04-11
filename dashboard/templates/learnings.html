@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+{% block page_title %}Learnings{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-6 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+        <h2 class="section-heading" style="font-size:22px">Learnings</h2>
+        <span class="text-xs text-gray-400">AI learns from your feedback and post performance</span>
+    </div>
+    <div class="flex items-center gap-2">
+        <button onclick="toggleShowAll()" id="toggle-all-btn" class="btn btn-ghost btn-sm text-xs">Show All</button>
+        <button onclick="runAnalysis()" id="analyze-btn" class="btn btn-primary btn-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            Run Analysis
+        </button>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div id="summary-cards" class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
+    <div class="glass-card stat-card p-6 fade-in-up stagger-1">
+        <p class="stat-label">Active Insights</p>
+        <p id="stat-active" class="stat-value mt-1">-</p>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-2">
+        <p class="stat-label">Categories</p>
+        <p id="stat-categories" class="stat-value mt-1">-</p>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-3">
+        <p class="stat-label">Times Used in Prompts</p>
+        <p id="stat-used" class="stat-value mt-1">-</p>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-4">
+        <p class="stat-label">Last Analysis</p>
+        <p id="stat-last-run" class="stat-value mt-1 text-sm">-</p>
+    </div>
+</div>
+
+<!-- Insights grid -->
+<div id="insights-container">
+    <div id="insights-empty" class="hidden glass-card p-12 text-center">
+        <svg class="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        <p class="text-sm text-gray-500 mb-1">No insights yet</p>
+        <p class="text-xs text-gray-400 mb-4">Post content and gather feedback to start learning. Need at least 10 posted posts.</p>
+        <button onclick="runAnalysis()" class="btn btn-primary btn-sm">Run First Analysis</button>
+    </div>
+    <div id="insights-grid" class="grid gap-5"></div>
+</div>
+
+<!-- Autoresearch Experiments -->
+<div class="mt-8">
+    <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-2">
+            <h3 class="text-sm font-semibold text-gray-700">Autoresearch Experiments</h3>
+            <span class="text-xs text-gray-400">Karpathy-style autonomous testing</span>
+        </div>
+        <div class="flex items-center gap-2">
+            <a href="/experiments" class="text-xs text-blue-600 hover:text-blue-800 font-medium">View All &rarr;</a>
+            <button onclick="runAutoresearch()" id="autoresearch-btn" class="btn btn-ghost btn-sm text-xs">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Run Experiments
+            </button>
+        </div>
+    </div>
+
+    <!-- Experiment summary cards -->
+    <div id="exp-summary" class="grid grid-cols-2 md:grid-cols-5 gap-5 mb-4">
+        <div class="glass-card stat-card p-6 fade-in-up stagger-1">
+            <p class="stat-label">Experiments</p>
+            <p id="exp-total" class="stat-value mt-1" style="font-size:24px">-</p>
+        </div>
+        <div class="glass-card stat-card p-6 fade-in-up stagger-2">
+            <p class="stat-label">Avg Winner</p>
+            <p id="exp-avg-score" class="stat-value mt-1" style="font-size:24px">-</p>
+        </div>
+        <div class="glass-card stat-card p-6 fade-in-up stagger-3">
+            <p class="stat-label">Avg Spread</p>
+            <p id="exp-spread" class="stat-value mt-1" style="font-size:24px">-</p>
+        </div>
+        <div class="glass-card stat-card p-6 fade-in-up stagger-4">
+            <p class="stat-label">Queued</p>
+            <p id="exp-queued" class="stat-value mt-1" style="font-size:24px">-</p>
+        </div>
+        <div class="glass-card stat-card p-6 fade-in-up stagger-5">
+            <p class="stat-label">Calibration</p>
+            <p id="exp-calibration" class="stat-value mt-1" style="font-size:24px">-</p>
+        </div>
+    </div>
+
+    <!-- Win rates bars -->
+    <div id="exp-win-rates" class="hidden mb-4">
+        <div id="exp-win-rates-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+    </div>
+
+    <!-- Recent experiments table -->
+    <div class="glass-card overflow-hidden">
+        <div id="exp-empty" class="hidden p-8 text-center">
+            <svg class="w-10 h-10 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <p class="text-xs text-gray-500 mb-1">No experiments yet</p>
+            <p class="text-xs text-gray-400">Run your first autoresearch cycle to start testing variations.</p>
+        </div>
+        <div id="exp-table"></div>
+    </div>
+</div>
+
+<!-- Analysis history -->
+<div class="mt-8">
+    <h3 class="text-sm font-semibold text-gray-700 mb-3">Analysis History</h3>
+    <div id="history-container" class="glass-card overflow-hidden">
+        <div id="history-empty" class="hidden p-6 text-center text-xs text-gray-400">No analysis runs yet</div>
+        <div id="history-table"></div>
+    </div>
+</div>
+
+<script>
+let showingAll = false;
+
+document.addEventListener('DOMContentLoaded', () => {
+    loadLearnings();
+    loadHistory();
+    loadExperimentsSummary();
+    loadRecentExperiments();
+});
+
+async function loadLearnings() {
+    const endpoint = showingAll ? '/api/learnings/all' : '/api/learnings';
+    const res = await fetch(endpoint);
+    const insights = await res.json();
+
+    // Update summary
+    const active = insights.filter(i => i.is_active);
+    const categories = new Set(active.map(i => i.category));
+    const totalUsed = active.reduce((sum, i) => sum + (i.times_used || 0), 0);
+
+    document.getElementById('stat-active').textContent = active.length;
+    document.getElementById('stat-categories').textContent = categories.size;
+    document.getElementById('stat-used').textContent = totalUsed;
+
+    // Render insights
+    const grid = document.getElementById('insights-grid');
+    const empty = document.getElementById('insights-empty');
+
+    if (insights.length === 0) {
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+
+    grid.innerHTML = insights.map(i => renderInsight(i)).join('');
+}
+
+function renderInsight(i) {
+    const categoryColors = {
+        hook_style: 'bg-purple-50 text-purple-700 border-purple-200',
+        tone: 'bg-blue-50 text-blue-700 border-blue-200',
+        topic: 'bg-green-50 text-green-700 border-green-200',
+        template: 'bg-amber-50 text-amber-700 border-amber-200',
+        angle: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+        format: 'bg-teal-50 text-teal-700 border-teal-200',
+        length: 'bg-orange-50 text-orange-700 border-orange-200',
+        timing: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+        rejection_pattern: 'bg-red-50 text-red-700 border-red-200',
+        edit_pattern: 'bg-pink-50 text-pink-700 border-pink-200',
+        general: 'bg-gray-50 text-gray-700 border-gray-200',
+    };
+
+    const sourceLabels = {
+        performance_analysis: 'Performance',
+        rejection_analysis: 'Rejections',
+        edit_analysis: 'Edits',
+        manual: 'Manual',
+    };
+
+    const color = categoryColors[i.category] || categoryColors.general;
+    const inactive = !i.is_active ? 'opacity-50' : '';
+    const confidencePct = Math.round(i.confidence * 100);
+    const confidenceColor = confidencePct >= 70 ? 'bg-green-500' : confidencePct >= 50 ? 'bg-amber-500' : 'bg-gray-400';
+    const categoryLabel = i.category.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+
+    return `
+    <div class="glass-card p-6 ${inactive}" id="insight-${i.id}">
+        <div class="flex items-start justify-between mb-2">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="px-2 py-0.5 text-xs font-medium rounded-md border ${color}">${categoryLabel}</span>
+                <span class="text-xs text-gray-400">${sourceLabels[i.source] || i.source}</span>
+            </div>
+            <button onclick="toggleInsight(${i.id}, ${i.is_active})"
+                    class="text-xs px-2 py-1 rounded-md border ${i.is_active ? 'border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200' : 'border-green-200 text-green-600 hover:bg-green-50'} transition-all">
+                ${i.is_active ? 'Deactivate' : 'Activate'}
+            </button>
+        </div>
+        <p class="text-sm text-gray-900 font-medium mb-1">${i.insight_text}</p>
+        <p class="text-xs text-gray-500 mb-3 italic">"${i.prompt_directive}"</p>
+        <div class="flex items-center gap-4 text-xs text-gray-400">
+            <div class="flex items-center gap-1.5">
+                <span>Confidence:</span>
+                <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full ${confidenceColor}" style="width: ${confidencePct}%"></div>
+                </div>
+                <span>${confidencePct}%</span>
+            </div>
+            <span>n=${i.sample_size}</span>
+            <span>Used ${i.times_used}x</span>
+            ${i.created_at ? `<span>${formatDate(i.created_at)}</span>` : ''}
+        </div>
+    </div>`;
+}
+
+async function toggleInsight(id, currentlyActive) {
+    const action = currentlyActive ? 'deactivate' : 'activate';
+    await fetch(`/api/learnings/${id}/${action}`, { method: 'POST' });
+    loadLearnings();
+}
+
+async function runAnalysis() {
+    const btn = document.getElementById('analyze-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg> Analyzing...';
+
+    try {
+        const res = await fetch('/api/learnings/analyze', { method: 'POST' });
+        const data = await res.json();
+        if (data.results?.skipped) {
+            showToast(`Need at least ${data.results.posted_count || 0}/10 posted posts for analysis`, 'info');
+        } else {
+            showToast('Analysis complete — insights updated');
+        }
+        loadLearnings();
+        loadHistory();
+    } catch (e) {
+        showToast('Analysis failed', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg> Run Analysis';
+    }
+}
+
+function toggleShowAll() {
+    showingAll = !showingAll;
+    document.getElementById('toggle-all-btn').textContent = showingAll ? 'Active Only' : 'Show All';
+    loadLearnings();
+}
+
+async function loadHistory() {
+    const res = await fetch('/api/learnings/history');
+    const runs = await res.json();
+
+    const container = document.getElementById('history-table');
+    const empty = document.getElementById('history-empty');
+
+    // Update last analysis stat
+    if (runs.length > 0) {
+        document.getElementById('stat-last-run').textContent = formatDate(runs[0].created_at);
+    }
+
+    if (runs.length === 0) {
+        container.innerHTML = '';
+        empty.classList.remove('hidden');
+        return;
+    }
+    empty.classList.add('hidden');
+
+    container.innerHTML = `
+    <table class="w-full text-xs">
+        <thead>
+            <tr class="border-b border-gray-100">
+                <th class="text-left px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                <th class="text-left px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                <th class="text-right px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Posts</th>
+                <th class="text-right px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                <th class="text-right px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Updated</th>
+                <th class="text-right px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+            </tr>
+        </thead>
+        <tbody>
+            ${runs.map(r => `
+            <tr class="border-b border-gray-50 hover:bg-gray-50">
+                <td class="px-4 py-2.5 text-gray-600">${formatDate(r.created_at)}</td>
+                <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs">${r.run_type}</span></td>
+                <td class="px-4 py-2.5 text-right text-gray-900">${r.posts_analyzed}</td>
+                <td class="px-4 py-2.5 text-right text-green-600 font-medium">+${r.insights_created}</td>
+                <td class="px-4 py-2.5 text-right text-amber-600">${r.insights_updated || 0}</td>
+                <td class="px-4 py-2.5 text-right text-gray-400">${r.duration_seconds ? r.duration_seconds.toFixed(1) + 's' : '-'}</td>
+            </tr>
+            `).join('')}
+        </tbody>
+    </table>`;
+}
+
+function formatDate(iso) {
+    if (!iso) return '-';
+    const d = new Date(iso);
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+}
+
+// ── Autoresearch Experiments ──
+
+async function loadExperimentsSummary() {
+    try {
+        const res = await fetch('/api/experiments/summary');
+        const data = await res.json();
+        const s = data.summary;
+
+        document.getElementById('exp-total').textContent = s.total_experiments || 0;
+        document.getElementById('exp-avg-score').textContent = s.avg_winner_score || '-';
+        document.getElementById('exp-spread').textContent = s.avg_score_spread || '-';
+        document.getElementById('exp-queued').textContent = s.queued_winners || 0;
+        document.getElementById('exp-calibration').textContent = s.avg_calibration_delta != null
+            ? (s.avg_calibration_delta > 0 ? '+' : '') + s.avg_calibration_delta
+            : '-';
+
+        // Win rates
+        const wr = data.win_rates;
+        if (wr && Object.keys(wr).length > 0) {
+            document.getElementById('exp-win-rates').classList.remove('hidden');
+            const grid = document.getElementById('exp-win-rates-grid');
+            grid.innerHTML = '';
+            for (const [type, params] of Object.entries(wr)) {
+                const sorted = Object.entries(params).sort((a, b) => b[1].win_rate - a[1].win_rate);
+                const bars = sorted.map(([label, d]) => `
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs text-gray-600 w-24 truncate" title="${label}">${label}</span>
+                        <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full ${d.win_rate > 40 ? 'bg-green-500' : d.win_rate > 20 ? 'bg-blue-500' : 'bg-gray-300'}" style="width: ${Math.max(d.win_rate, 5)}%"></div>
+                        </div>
+                        <span class="text-xs font-medium text-gray-700 w-12 text-right">${d.win_rate}%</span>
+                        <span class="text-xs text-gray-400 w-10 text-right">${d.avg_score}</span>
+                    </div>
+                `).join('');
+                grid.innerHTML += `
+                    <div class="glass-card p-6">
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">${type}</h4>
+                        ${bars}
+                    </div>
+                `;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load experiments summary:', e);
+    }
+}
+
+async function loadRecentExperiments() {
+    try {
+        const res = await fetch('/api/experiments');
+        const experiments = await res.json();
+
+        const table = document.getElementById('exp-table');
+        const empty = document.getElementById('exp-empty');
+
+        if (experiments.length === 0) {
+            table.innerHTML = '';
+            empty.classList.remove('hidden');
+            return;
+        }
+        empty.classList.add('hidden');
+
+        const typeColors = {
+            hook: 'bg-purple-100 text-purple-700',
+            tone: 'bg-blue-100 text-blue-700',
+            template: 'bg-green-100 text-green-700',
+            length: 'bg-orange-100 text-orange-700',
+            angle: 'bg-pink-100 text-pink-700',
+        };
+
+        // Show last 10
+        const recent = experiments.slice(0, 10);
+        table.innerHTML = `
+        <table class="w-full text-xs">
+            <thead>
+                <tr class="border-b border-gray-100">
+                    <th class="text-left px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th class="text-left px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                    <th class="text-left px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Topic</th>
+                    <th class="text-center px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Variations</th>
+                    <th class="text-left px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Winner</th>
+                    <th class="text-right px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Score</th>
+                    <th class="text-right px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Spread</th>
+                    <th class="text-center px-4 py-2.5 font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${recent.map(exp => {
+                    const winner = exp.variations.find(v => v.is_winner);
+                    const tc = typeColors[exp.type] || 'bg-gray-100 text-gray-700';
+                    const dots = exp.variations.map(v => {
+                        const s = v.virality_score || 0;
+                        const c = v.is_winner ? 'bg-green-500 text-white' : s >= 65 ? 'bg-blue-100 text-blue-700' : s >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500';
+                        return `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${c}" title="${v.label}: ${s}">${s}</span>`;
+                    }).join('');
+                    return `
+                    <tr class="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onclick="window.location='/experiments'">
+                        <td class="px-4 py-2.5 text-gray-500">${formatDate(exp.created_at)}</td>
+                        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md text-xs font-medium ${tc}">${exp.type}</span></td>
+                        <td class="px-4 py-2.5 text-gray-700 max-w-[200px] truncate">${exp.topic || '-'}</td>
+                        <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-0.5">${dots}</div></td>
+                        <td class="px-4 py-2.5 text-gray-900 font-medium">${winner ? winner.label : '-'}</td>
+                        <td class="px-4 py-2.5 text-right font-bold ${(exp.winner_score || 0) >= 65 ? 'text-green-600' : (exp.winner_score || 0) >= 40 ? 'text-yellow-600' : 'text-gray-500'}">${exp.winner_score || '-'}</td>
+                        <td class="px-4 py-2.5 text-right text-gray-400">${exp.score_spread || 0}</td>
+                        <td class="px-4 py-2.5 text-center">${exp.queued_post_id ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 text-[10px] font-medium">Queued</span>' : '<span class="text-gray-300">-</span>'}</td>
+                    </tr>`;
+                }).join('')}
+            </tbody>
+        </table>`;
+    } catch (e) {
+        console.error('Failed to load experiments:', e);
+    }
+}
+
+async function runAutoresearch() {
+    const btn = document.getElementById('autoresearch-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/></svg> Running...';
+
+    try {
+        const res = await fetch('/api/autoresearch/run', { method: 'POST' });
+        const data = await res.json();
+        showToast(`Autoresearch complete: ${data.experiments_run} experiments, check results below`);
+        loadExperimentsSummary();
+        loadRecentExperiments();
+    } catch (e) {
+        showToast('Autoresearch failed: ' + e.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Run Experiments';
+    }
+}
+</script>
+
+{% endblock %}

@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% block page_title %}Schedule{% endblock %}
+
+{% block content %}
+
+<!-- Stat cards -->
+<div class="grid grid-cols-3 gap-5 mb-8">
+    <div class="glass-card stat-card p-6 fade-in-up stagger-1">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="stat-label">Scheduled</p>
+                <p class="stat-value mt-1" id="stat-scheduled">{{ stats.get('scheduled', 0) }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            </div>
+        </div>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-2">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="stat-label">Available to Schedule</p>
+                <p class="stat-value mt-1" id="stat-available">{{ stats.get('approved', 0) + stats.get('queued', 0) }}</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+        </div>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-3">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="stat-label">Next Post</p>
+                <p class="stat-value mt-1" style="font-size:20px" id="stat-next">--</p>
+            </div>
+            <div class="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+    <div class="flex items-center gap-3">
+        <h2 class="section-heading" style="font-size:22px">Posting Schedule</h2>
+        <div class="flex items-center bg-white border border-gray-200 rounded-lg p-0.5">
+            <button onclick="prevWeek()" class="px-3 py-1.5 text-xs rounded-md font-medium text-gray-500 hover:bg-gray-50 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <button onclick="goToToday()" class="px-3 py-1.5 text-xs rounded-md font-medium text-gray-500 hover:bg-gray-50 transition-all">Today</button>
+            <button onclick="nextWeek()" class="px-3 py-1.5 text-xs rounded-md font-medium text-gray-500 hover:bg-gray-50 transition-all">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+        </div>
+        <span id="week-label" class="text-sm text-gray-400"></span>
+    </div>
+    <button onclick="openScheduleModal()" class="btn btn-primary btn-sm">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+        Schedule a Post
+    </button>
+</div>
+
+<!-- Timeline container -->
+<div id="schedule-container" class="space-y-4">
+    <div class="text-center py-16">
+        <div class="inline-flex items-center gap-2 text-gray-400">
+            <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+            Loading schedule...
+        </div>
+    </div>
+</div>
+
+<!-- Schedule modal -->
+<div id="schedule-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] overflow-y-auto fade-in">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-semibold text-gray-900" id="schedule-modal-title">Schedule Post</h3>
+                <button onclick="closeScheduleModal()" class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Post selector (hidden when rescheduling) -->
+            <div id="schedule-post-picker" class="mb-4">
+                <label class="text-sm font-medium text-gray-700 mb-1.5 block">Select Post</label>
+                <select id="schedule-post-select" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none" onchange="updatePostPreview()">
+                    <option value="">Choose a post...</option>
+                </select>
+            </div>
+
+            <!-- Post preview -->
+            <div id="schedule-post-preview" class="hidden mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100 text-sm text-gray-600 max-h-32 overflow-y-auto whitespace-pre-wrap"></div>
+
+            <!-- Date/time pickers -->
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <div>
+                    <label class="text-sm font-medium text-gray-700 mb-1.5 block">Date</label>
+                    <input type="date" id="schedule-date" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+                <div>
+                    <label class="text-sm font-medium text-gray-700 mb-1.5 block">Time</label>
+                    <input type="time" id="schedule-time" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none">
+                </div>
+            </div>
+
+            <!-- Quick time buttons -->
+            <div class="flex items-center gap-2 mb-5">
+                <span class="text-xs text-gray-400">Quick:</span>
+                <button onclick="setQuickTime('10:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">10 AM</button>
+                <button onclick="setQuickTime('12:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">12 PM</button>
+                <button onclick="setQuickTime('16:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">4 PM</button>
+                <button onclick="setQuickTime('22:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">10 PM</button>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeScheduleModal()" class="btn btn-ghost btn-md">Cancel</button>
+                <button onclick="submitSchedule()" id="schedule-submit-btn" class="btn btn-primary btn-md">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    Schedule
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let scheduleData = { scheduled: [], available: [] };
+let currentWeekStart = getMondayOfWeek(new Date());
+let reschedulePostId = null;
+const DEFAULT_SLOTS = ['10:00', '12:00', '16:00', '22:00'];
+
+document.addEventListener('DOMContentLoaded', loadSchedule);
+
+async function loadSchedule() {
+    try {
+        const res = await fetch('/api/schedule');
+        scheduleData = await res.json();
+        updateStats();
+        renderTimeline();
+    } catch (e) {
+        console.error('Failed to load schedule:', e);
+        document.getElementById('schedule-container').innerHTML = `
+            <div class="text-center py-16">
+                <p class="text-red-500 font-medium">Failed to load schedule</p>
+                <p class="text-gray-400 text-sm mt-1">Is the server running?</p>
+            </div>`;
+    }
+}
+
+function updateStats() {
+    document.getElementById('stat-scheduled').textContent = scheduleData.scheduled.length;
+    document.getElementById('stat-available').textContent = scheduleData.available.length;
+    if (scheduleData.scheduled.length > 0) {
+        const next = scheduleData.scheduled[0];
+        const dt = new Date(next.scheduled_time);
+        const now = new Date();
+        const diffMs = dt - now;
+        if (diffMs > 0) {
+            const diffH = Math.floor(diffMs / 3600000);
+            const diffM = Math.floor((diffMs % 3600000) / 60000);
+            if (diffH >= 24) {
+                document.getElementById('stat-next').textContent = formatDateShort(dt);
+            } else {
+                document.getElementById('stat-next').textContent = `in ${diffH}h ${diffM}m`;
+            }
+        } else {
+            document.getElementById('stat-next').textContent = 'Due now';
+        }
+    } else {
+        document.getElementById('stat-next').textContent = '--';
+    }
+}
+
+function renderTimeline() {
+    const container = document.getElementById('schedule-container');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Build lookup: date string -> array of scheduled posts
+    const byDate = {};
+    scheduleData.scheduled.forEach(p => {
+        if (!p.scheduled_time) return;
+        const dt = new Date(p.scheduled_time);
+        const key = toDateKey(dt);
+        if (!byDate[key]) byDate[key] = [];
+        byDate[key].push({ ...p, _dt: dt });
+    });
+
+    // Update week label
+    const weekEnd = new Date(currentWeekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    document.getElementById('week-label').textContent =
+        `${formatDateShort(currentWeekStart)} - ${formatDateShort(weekEnd)}`;
+
+    let html = '';
+    for (let d = 0; d < 7; d++) {
+        const day = new Date(currentWeekStart);
+        day.setDate(day.getDate() + d);
+        const key = toDateKey(day);
+        const dayPosts = (byDate[key] || []).sort((a, b) => a._dt - b._dt);
+        const isPast = day < today;
+
+        // Day header
+        const dayLabel = getDayLabel(day, today);
+        const dateLabel = day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        const postCount = dayPosts.length;
+
+        html += `<div class="glass-card p-6 fade-in ${isPast ? 'opacity-50' : ''}" style="animation-delay: ${d * 40}ms">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <h3 class="text-base font-semibold text-gray-900">${esc(dayLabel)}</h3>
+                    <span class="text-sm text-gray-400">${dateLabel}</span>
+                </div>
+                ${postCount > 0 ? `<span class="badge bg-blue-50 text-blue-600">${postCount} post${postCount !== 1 ? 's' : ''}</span>` : ''}
+            </div>
+            <div class="space-y-2">`;
+
+        // Merge default slots with actual posts
+        const usedTimes = new Set(dayPosts.map(p => {
+            const h = String(p._dt.getHours()).padStart(2, '0');
+            const m = String(p._dt.getMinutes()).padStart(2, '0');
+            return `${h}:${m}`;
+        }));
+
+        // Collect all slots: defaults + actual post times
+        const allSlots = new Set([...DEFAULT_SLOTS]);
+        dayPosts.forEach(p => {
+            const h = String(p._dt.getHours()).padStart(2, '0');
+            const m = String(p._dt.getMinutes()).padStart(2, '0');
+            allSlots.add(`${h}:${m}`);
+        });
+        const sortedSlots = [...allSlots].sort();
+
+        sortedSlots.forEach(slot => {
+            const matchingPosts = dayPosts.filter(p => {
+                const h = String(p._dt.getHours()).padStart(2, '0');
+                const m = String(p._dt.getMinutes()).padStart(2, '0');
+                return `${h}:${m}` === slot;
+            });
+
+            if (matchingPosts.length > 0) {
+                matchingPosts.forEach(p => {
+                    const viralityBadge = p.virality_score
+                        ? `<span class="badge ${p.virality_score >= 70 ? 'bg-amber-50 text-amber-700' : p.virality_score >= 40 ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'} text-[11px]">${p.virality_score}/100</span>`
+                        : '';
+                    html += `<div class="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                        <span class="text-sm font-mono font-medium text-blue-600 w-20 shrink-0">${formatTimeSlot(slot)}</span>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm text-gray-700 truncate">${esc(p.content)}</p>
+                            <div class="flex items-center gap-2 mt-1 flex-wrap">
+                                ${p.template_name ? `<span class="badge bg-blue-50 text-blue-700 text-[11px]">${esc(p.template_name)}</span>` : ''}
+                                ${p.topic ? `<span class="badge bg-gray-50 text-gray-600 text-[11px]">${esc(p.topic)}</span>` : ''}
+                                ${viralityBadge}
+                                ${p.word_count ? `<span class="text-[11px] text-gray-400">${p.word_count} words</span>` : ''}
+                                ${p.has_image ? '<span class="badge bg-purple-50 text-purple-600 text-[11px]">img</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1.5 shrink-0">
+                            <button onclick="openRescheduleModal(${p.id})" class="btn btn-ghost btn-sm text-xs">Reschedule</button>
+                            <button onclick="unschedulePost(${p.id})" class="btn btn-ghost btn-sm text-xs text-red-500 hover:bg-red-50">Unschedule</button>
+                            <button onclick="postNow(${p.id}, this)" class="btn btn-primary btn-sm text-xs">Post Now</button>
+                        </div>
+                    </div>`;
+                });
+            } else {
+                // Empty slot
+                const dateStr = toInputDate(day);
+                html += `<div class="flex items-center gap-3 p-3 rounded-lg border border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50/30 transition-colors cursor-pointer"
+                     onclick="openScheduleModal('${dateStr}', '${slot}')">
+                    <span class="text-sm font-mono text-gray-400 w-20 shrink-0">${formatTimeSlot(slot)}</span>
+                    <div class="flex-1">
+                        <span class="text-sm text-gray-400">Empty slot</span>
+                    </div>
+                    <span class="text-xs text-blue-500 font-medium hover:text-blue-700">+ Schedule</span>
+                </div>`;
+            }
+        });
+
+        html += '</div></div>';
+    }
+
+    container.innerHTML = html;
+}
+
+/* ── Schedule modal ──────────────────────────────────────── */
+
+function openScheduleModal(preDate, preTime) {
+    reschedulePostId = null;
+    document.getElementById('schedule-modal-title').textContent = 'Schedule Post';
+    document.getElementById('schedule-submit-btn').innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Schedule`;
+    document.getElementById('schedule-post-picker').style.display = '';
+
+    // Populate post dropdown
+    const select = document.getElementById('schedule-post-select');
+    select.innerHTML = '<option value="">Choose a post...</option>';
+    scheduleData.available.forEach(p => {
+        const label = `#${p.id} - ${p.topic || p.template_name || 'Untitled'} (${p.word_count || 0} words)${p.virality_score ? ' [' + p.virality_score + '/100]' : ''}`;
+        select.innerHTML += `<option value="${p.id}">${esc(label)}</option>`;
+    });
+
+    // Set date/time
+    if (preDate) {
+        document.getElementById('schedule-date').value = preDate;
+    } else {
+        const tomorrow = new Date();
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        document.getElementById('schedule-date').value = toInputDate(tomorrow);
+    }
+    document.getElementById('schedule-time').value = preTime || '10:00';
+
+    document.getElementById('schedule-post-preview').classList.add('hidden');
+    document.getElementById('schedule-modal').classList.remove('hidden');
+}
+
+function openRescheduleModal(postId) {
+    const post = scheduleData.scheduled.find(p => p.id === postId);
+    if (!post) return;
+
+    reschedulePostId = postId;
+    document.getElementById('schedule-modal-title').textContent = 'Reschedule Post';
+    document.getElementById('schedule-submit-btn').innerHTML = `
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+        Update Schedule`;
+    document.getElementById('schedule-post-picker').style.display = 'none';
+
+    // Show post preview
+    const preview = document.getElementById('schedule-post-preview');
+    preview.textContent = post.full_content || post.content;
+    preview.classList.remove('hidden');
+
+    // Set current date/time
+    const dt = new Date(post.scheduled_time);
+    document.getElementById('schedule-date').value = toInputDate(dt);
+    document.getElementById('schedule-time').value = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+
+    document.getElementById('schedule-modal').classList.remove('hidden');
+}
+
+function closeScheduleModal() {
+    document.getElementById('schedule-modal').classList.add('hidden');
+    reschedulePostId = null;
+}
+
+function updatePostPreview() {
+    const select = document.getElementById('schedule-post-select');
+    const preview = document.getElementById('schedule-post-preview');
+    const postId = parseInt(select.value);
+    if (!postId) {
+        preview.classList.add('hidden');
+        return;
+    }
+    const post = scheduleData.available.find(p => p.id === postId);
+    if (post) {
+        preview.textContent = post.content;
+        preview.classList.remove('hidden');
+    }
+}
+
+function setQuickTime(time) {
+    document.getElementById('schedule-time').value = time;
+}
+
+async function submitSchedule() {
+    const postId = reschedulePostId || parseInt(document.getElementById('schedule-post-select').value);
+    const date = document.getElementById('schedule-date').value;
+    const time = document.getElementById('schedule-time').value;
+
+    if (!postId) { showToast('Select a post', 'error'); return; }
+    if (!date || !time) { showToast('Select date and time', 'error'); return; }
+
+    const scheduledTime = `${date}T${time}:00`;
+
+    try {
+        const res = await fetch(`/api/queue/${postId}/schedule`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ scheduled_time: scheduledTime }),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(reschedulePostId ? 'Post rescheduled' : 'Post scheduled');
+            closeScheduleModal();
+            loadSchedule();
+        } else {
+            showToast(data.error || 'Failed to schedule', 'error');
+        }
+    } catch (e) {
+        showToast('Failed to schedule', 'error');
+    }
+}
+
+async function unschedulePost(postId) {
+    if (!confirm('Remove this post from the schedule? It will go back to Approved.')) return;
+    try {
+        const res = await fetch(`/api/queue/${postId}/unschedule`, { method: 'POST' });
+        if (res.ok) {
+            showToast('Post unscheduled');
+            loadSchedule();
+        } else {
+            const data = await res.json();
+            showToast(data.error || 'Failed to unschedule', 'error');
+        }
+    } catch (e) {
+        showToast('Failed to unschedule', 'error');
+    }
+}
+
+async function postNow(postId, btn) {
+    if (!confirm('Post this to LinkedIn right now?')) return;
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) {
+        btn.disabled = true;
+        btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>';
+    }
+    try {
+        const res = await fetch(`/api/post-now/${postId}`, { method: 'POST' });
+        if (res.ok) {
+            showToast('Posted to LinkedIn!');
+            loadSchedule();
+        } else {
+            const data = await res.json().catch(() => ({}));
+            showToast(data.error || 'Failed to post', 'error');
+        }
+    } catch (e) {
+        showToast('Failed to post', 'error');
+    } finally {
+        if (btn) { btn.disabled = false; btn.innerHTML = origHtml; }
+    }
+}
+
+/* ── Week navigation ─────────────────────────────────────── */
+
+function prevWeek() {
+    currentWeekStart.setDate(currentWeekStart.getDate() - 7);
+    renderTimeline();
+}
+
+function nextWeek() {
+    currentWeekStart.setDate(currentWeekStart.getDate() + 7);
+    renderTimeline();
+}
+
+function goToToday() {
+    currentWeekStart = getMondayOfWeek(new Date());
+    renderTimeline();
+}
+
+/* ── Helpers ─────────────────────────────────────────────── */
+
+function getMondayOfWeek(date) {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    return d;
+}
+
+function toDateKey(date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function toInputDate(date) {
+    return toDateKey(date);
+}
+
+function getDayLabel(date, today) {
+    const t = new Date(today);
+    t.setHours(0, 0, 0, 0);
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    const diff = Math.round((d - t) / 86400000);
+    if (diff === 0) return 'Today';
+    if (diff === 1) return 'Tomorrow';
+    if (diff === -1) return 'Yesterday';
+    return date.toLocaleDateString('en-US', { weekday: 'long' });
+}
+
+function formatDateShort(date) {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatTimeSlot(slot) {
+    const [h, m] = slot.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hr = h % 12 || 12;
+    return m === 0 ? `${hr}:00 ${ampm}` : `${hr}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+function esc(t) {
+    const d = document.createElement('div');
+    d.textContent = t || '';
+    return d.innerHTML;
+}
+
+// Modal keyboard shortcuts
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeScheduleModal();
+});
+document.getElementById('schedule-modal')?.addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeScheduleModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 180" width="140" height="180">
+  <!-- Blue tall rounded tab (right side, flat left edge, rounded top+bottom right) -->
+  <rect x="52" y="32" width="86" height="146" rx="43" ry="43" fill="#0066FF"/>
+  <!-- Make left side flat by covering the left rounded corners -->
+  <rect x="52" y="32" width="43" height="146" fill="#0066FF"/>
+  <!-- Orange circle (top-left, overlaps blue) -->
+  <circle cx="56" cy="56" r="54" fill="#FF6A00"/>
+</svg>

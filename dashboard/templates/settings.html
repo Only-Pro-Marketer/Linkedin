@@ -1,0 +1,242 @@
+{% extends "base.html" %}
+{% block page_title %}Settings{% endblock %}
+
+{% block content %}
+<h2 class="section-heading mb-6" style="font-size:22px">Settings</h2>
+
+<div class="space-y-4 max-w-2xl">
+    <!-- LinkedIn Connection -->
+    <div class="glass-card p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-900">LinkedIn Connection</h3>
+        </div>
+
+        {% if auth_status and auth_status.authenticated %}
+        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
+            <div class="flex items-center gap-2 mb-2">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                <span class="text-sm font-medium text-emerald-800">Connected</span>
+                <span class="text-xs text-emerald-600 ml-auto">{{ auth_status.access_days_left }} days remaining</span>
+            </div>
+            <div class="text-xs text-emerald-700 space-y-1 mt-2">
+                <p>Person URN: <code class="bg-emerald-100 px-1.5 py-0.5 rounded text-[11px]">{{ auth_status.person_urn }}</code></p>
+                <p>Refresh token: {{ 'Available' if auth_status.has_refresh_token else 'Not available' }}</p>
+            </div>
+            <!-- Scopes -->
+            <div class="mt-3 pt-3 border-t border-emerald-200">
+                <p class="text-xs font-medium text-emerald-800 mb-1.5">Permissions:</p>
+                <div class="flex flex-wrap gap-1.5">
+                    {% for scope in auth_status.scopes or [] %}
+                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800">{{ scope }}</span>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="refreshToken()" class="btn btn-primary btn-sm">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh Token
+            </button>
+            <a href="/auth/login" class="btn btn-ghost btn-sm">Re-connect</a>
+        </div>
+        {% else %}
+        <p class="text-sm text-gray-600 mb-4">Connect your LinkedIn account to enable posting.</p>
+        <a href="/auth/login" class="btn btn-primary btn-md">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg>
+            Connect LinkedIn Account
+        </a>
+        {% endif %}
+    </div>
+
+    <!-- My LinkedIn Profile (for scraping) -->
+    <div class="glass-card p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-900">My LinkedIn Profile</h3>
+        </div>
+        <p class="text-xs text-gray-500 mb-3">Set your LinkedIn profile URL to enable daily post scraping via Apify. This imports your post history, engagement data, and AI analysis — no special API scope needed.</p>
+        <div class="flex gap-2 mb-3">
+            <input type="text" id="profile-url-input" placeholder="https://www.linkedin.com/in/your-username" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
+            <button onclick="saveProfileUrl()" id="save-url-btn" class="btn btn-primary btn-sm">Save</button>
+        </div>
+        <div id="profile-url-status" class="hidden mb-3"></div>
+        <div class="flex gap-2">
+            <button onclick="scrapeMyProfile()" id="scrape-profile-btn" class="btn btn-sm" style="background:#eef2ff;color:#4f46e5;border:1px solid #c7d2fe;">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                Scrape Now
+            </button>
+            <a href="/analytics" class="btn btn-ghost btn-sm">View My Posts</a>
+        </div>
+        <p class="text-[11px] text-gray-400 mt-2">Auto-scrapes daily at 7:00 AM. Uses ~1 Apify actor run per scrape.</p>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="glass-card p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-900">Quick Actions</h3>
+        </div>
+        <div class="flex flex-wrap gap-2">
+            <button onclick="runResearchFromSettings()" id="settings-research-btn" class="btn btn-ghost btn-md">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                Run Research Now
+            </button>
+            <button onclick="generateFromSettings()" id="settings-gen-btn" class="btn btn-primary btn-md">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Generate 5 Posts
+            </button>
+        </div>
+    </div>
+
+    <!-- Scheduler -->
+    <div class="glass-card p-6">
+        <div class="flex items-center gap-3 mb-4">
+            <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
+                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            </div>
+            <h3 class="text-base font-semibold text-gray-900">Scheduler</h3>
+        </div>
+        <div class="space-y-3">
+            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
+                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                <span class="text-sm text-gray-700 flex-1">Research cycle</span>
+                <span class="text-sm font-medium text-gray-900">Every 6 hours</span>
+            </div>
+            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
+                <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+                <span class="text-sm text-gray-700 flex-1">Post generation</span>
+                <span class="text-sm font-medium text-gray-900">Every 4 hours <span class="text-xs text-gray-400">(when queue &lt; 10)</span></span>
+            </div>
+            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
+                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+                <span class="text-sm text-gray-700 flex-1">Posting check</span>
+                <span class="text-sm font-medium text-gray-900">Every 15 minutes</span>
+            </div>
+            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
+                <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
+                <span class="text-sm text-gray-700 flex-1">My profile scrape</span>
+                <span class="text-sm font-medium text-gray-900">Daily at 7 AM</span>
+            </div>
+            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
+                <span class="w-2 h-2 rounded-full bg-orange-400"></span>
+                <span class="text-sm text-gray-700 flex-1">Competitor scrape</span>
+                <span class="text-sm font-medium text-gray-900">Daily at 6 AM</span>
+            </div>
+            <div class="flex items-center gap-3 py-2">
+                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                <span class="text-sm text-gray-700 flex-1">Token refresh check</span>
+                <span class="text-sm font-medium text-gray-900">Daily at midnight</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Load current profile URL on page load
+document.addEventListener('DOMContentLoaded', async () => {
+    try {
+        const res = await fetch('/api/profile/url');
+        const data = await res.json();
+        if (data.url) {
+            document.getElementById('profile-url-input').value = data.url;
+        }
+    } catch(e) {}
+});
+
+async function saveProfileUrl() {
+    const btn = document.getElementById('save-url-btn');
+    const input = document.getElementById('profile-url-input');
+    const status = document.getElementById('profile-url-status');
+    const url = input.value.trim();
+
+    if (!url) { showToast('Please enter a LinkedIn profile URL', 'error'); return; }
+
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+        const res = await fetch('/api/profile/set-url', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({linkedin_profile_url: url}),
+        });
+        const data = await res.json();
+        if (res.ok) {
+            showToast('Profile URL saved!');
+            status.className = 'text-xs text-emerald-600 mb-3';
+            status.textContent = 'Saved. Click "Scrape Now" to import your posts.';
+            status.classList.remove('hidden');
+        } else {
+            showToast(data.error || 'Failed to save', 'error');
+        }
+    } catch(e) { showToast('Save failed', 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Save'; }
+}
+
+async function scrapeMyProfile() {
+    const btn = document.getElementById('scrape-profile-btn');
+    const status = document.getElementById('profile-url-status');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Scraping...';
+
+    try {
+        const res = await fetch('/api/profile/scrape', {method: 'POST'});
+        const data = await res.json();
+        if (res.ok) {
+            const msg = `Scrape complete! ${data.new_posts} new posts, ${data.updated_posts} updated, ${data.analyzed} analyzed. Total: ${data.total_posts}`;
+            showToast(msg);
+            status.className = 'text-xs text-emerald-600 mb-3';
+            status.innerHTML = msg;
+            status.classList.remove('hidden');
+
+            if (data.profile && data.profile.name) {
+                status.innerHTML += `<br>Profile: ${data.profile.name} | ${data.profile.followers} followers`;
+            }
+        } else {
+            showToast(data.error || 'Scrape failed', 'error');
+            status.className = 'text-xs text-red-600 mb-3';
+            status.textContent = data.error || 'Scrape failed';
+            status.classList.remove('hidden');
+        }
+    } catch(e) { showToast('Scrape failed: ' + e.message, 'error'); }
+    finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg> Scrape Now';
+    }
+}
+
+async function refreshToken() {
+    const res = await fetch('/auth/refresh', {method: 'POST'});
+    const data = await res.json();
+    if (res.ok) { showToast('Token refreshed!'); setTimeout(() => location.reload(), 1000); }
+    else { showToast('Refresh failed: ' + (data.error || 'unknown'), 'error'); }
+}
+
+async function runResearchFromSettings() {
+    const btn = document.getElementById('settings-research-btn');
+    btn.disabled = true; btn.textContent = 'Researching...';
+    try {
+        const res = await fetch('/api/research/run', {method: 'POST'});
+        const data = await res.json();
+        showToast(`Found ${data.items_found} research items`);
+    } catch(e) { showToast('Research failed', 'error'); }
+    finally { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg> Run Research Now'; }
+}
+
+async function generateFromSettings() {
+    const btn = document.getElementById('settings-gen-btn');
+    btn.disabled = true; btn.textContent = 'Generating...';
+    try {
+        const res = await fetch('/api/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({count: 5}) });
+        const data = await res.json();
+        showToast(`Generated ${data.count} posts! Check the Queue.`);
+    } catch(e) { showToast('Generation failed', 'error'); }
+    finally { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Generate 5 Posts'; }
+}
+</script>
+{% endblock %}

@@ -1,0 +1,672 @@
+{% extends "base.html" %}
+{% block page_title %}History{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <div>
+            <h1 class="section-heading" style="font-size:22px">Post History</h1>
+            <p class="text-sm text-gray-500 mt-1">Track your published, approved, and rejected posts</p>
+        </div>
+        <div class="flex items-center gap-2">
+            <button onclick="loadPosts(currentTab)" class="btn btn-ghost btn-sm" title="Refresh">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats row -->
+    <div class="grid grid-cols-4 gap-5">
+        <div class="glass-card stat-card p-6 cursor-pointer transition-all hover:shadow-md fade-in-up stagger-1" onclick="switchTab('posted')" id="stat-posted">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-violet-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <p class="stat-value">{{ stats.get('posted', 0) }}</p>
+                    <p class="stat-label">Published</p>
+                </div>
+            </div>
+        </div>
+        <div class="glass-card stat-card p-6 cursor-pointer transition-all hover:shadow-md fade-in-up stagger-2" onclick="switchTab('approved')" id="stat-approved">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                </div>
+                <div>
+                    <p class="stat-value">{{ stats.get('approved', 0) + stats.get('scheduled', 0) }}</p>
+                    <p class="stat-label">Ready to Post</p>
+                </div>
+            </div>
+        </div>
+        <div class="glass-card stat-card p-6 cursor-pointer transition-all hover:shadow-md fade-in-up stagger-3" onclick="switchTab('rejected')" id="stat-rejected">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </div>
+                <div>
+                    <p class="stat-value">{{ stats.get('rejected', 0) }}</p>
+                    <p class="stat-label">Rejected</p>
+                </div>
+            </div>
+        </div>
+        <div class="glass-card stat-card p-6 fade-in-up stagger-4">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center">
+                    <svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>
+                </div>
+                <div>
+                    <p class="stat-value">{{ stats.get('total', 0) }}</p>
+                    <p class="stat-label">Total Posts</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tabs + Search -->
+    <div class="flex items-center justify-between">
+        <div class="flex items-center gap-1 bg-gray-100 rounded-lg p-1">
+            <button onclick="switchTab('posted')" id="tab-posted" class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-all">
+                Published
+            </button>
+            <button onclick="switchTab('approved')" id="tab-approved" class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-all">
+                Approved
+            </button>
+            <button onclick="switchTab('rejected')" id="tab-rejected" class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-all">
+                Rejected
+            </button>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="relative">
+                <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                <input type="text" id="searchInput" placeholder="Search posts..." oninput="filterPosts()" class="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-56 bg-white">
+            </div>
+            <span id="post-count" class="text-sm text-gray-400"></span>
+        </div>
+    </div>
+
+    <!-- Post list -->
+    <div id="history-container" class="space-y-3">
+        <div class="text-center py-16">
+            <div class="inline-flex items-center gap-2 text-gray-400">
+                <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg>
+                Loading...
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- View post modal -->
+<div id="view-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto fade-in">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Post Details</h3>
+                    <p id="view-meta" class="text-xs text-gray-400 mt-0.5"></p>
+                </div>
+                <button onclick="closeViewModal()" class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Image preview -->
+            <div id="view-image" class="hidden mb-4">
+                <img id="view-image-src" src="" alt="Post image" class="w-full max-h-64 object-contain rounded-xl border border-gray-200 bg-gray-50">
+            </div>
+
+            <!-- Post content -->
+            <div id="view-content" class="p-4 bg-gray-50 rounded-xl text-sm leading-relaxed text-gray-700 whitespace-pre-wrap border border-gray-100 max-h-96 overflow-y-auto"></div>
+
+            <!-- Stats row under content -->
+            <div class="flex items-center gap-4 mt-3">
+                <span id="view-word-count" class="text-xs text-gray-400"></span>
+                <span id="view-char-count" class="text-xs text-gray-400"></span>
+            </div>
+
+            <!-- Virality score -->
+            <div id="view-virality" class="hidden mt-3 p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl border border-amber-100">
+                <div class="flex items-center gap-4">
+                    <div class="relative w-14 h-14 flex-shrink-0">
+                        <svg class="w-14 h-14 transform -rotate-90" viewBox="0 0 48 48">
+                            <circle cx="24" cy="24" r="20" fill="none" stroke="#fde68a" stroke-width="4"/>
+                            <circle id="view-virality-ring" cx="24" cy="24" r="20" fill="none" stroke="#f59e0b" stroke-width="4"
+                                stroke-dasharray="125.66" stroke-dashoffset="125.66" stroke-linecap="round" style="transition: stroke-dashoffset 0.8s ease"/>
+                        </svg>
+                        <div class="absolute inset-0 flex items-center justify-center">
+                            <span id="view-virality-score" class="text-sm font-bold text-amber-700">0</span>
+                        </div>
+                    </div>
+                    <div>
+                        <p class="text-xs font-semibold text-amber-800">Virality Score</p>
+                        <span id="view-virality-label" class="text-xs text-amber-600"></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rejection reason -->
+            <div id="view-rejection" class="hidden mt-3 p-3 bg-red-50 rounded-xl border border-red-100">
+                <p class="text-xs font-semibold text-red-700 mb-1">Rejection Reason</p>
+                <p id="view-rejection-text" class="text-sm text-red-600"></p>
+            </div>
+
+            <!-- Engagement stats -->
+            <div id="view-engagement" class="hidden mt-3 p-3 bg-gradient-to-r from-blue-50 to-violet-50 rounded-xl border border-blue-100">
+                <p class="text-xs font-semibold text-gray-600 mb-2">Engagement</p>
+                <div class="flex items-center gap-6">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66-.23-.45-.52-.86-.88-1.22L14 2 7.59 8.41C7.21 8.79 7 9.3 7 9.83v7.84C7 18.95 8.05 20 9.34 20h8.11c.7 0 1.36-.37 1.72-.97l2.66-6.15z"/></svg>
+                        </div>
+                        <div>
+                            <p id="view-likes" class="text-lg font-bold text-blue-700">0</p>
+                            <p class="text-[10px] text-gray-400 uppercase">Likes</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-emerald-600" fill="currentColor" viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>
+                        </div>
+                        <div>
+                            <p id="view-comments" class="text-lg font-bold text-emerald-700">0</p>
+                            <p class="text-[10px] text-gray-400 uppercase">Comments</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-violet-600" fill="currentColor" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+                        </div>
+                        <div>
+                            <p id="view-shares" class="text-lg font-bold text-violet-700">0</p>
+                            <p class="text-[10px] text-gray-400 uppercase">Shares</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="flex gap-2 justify-end mt-5 pt-4 border-t border-gray-100" id="view-actions"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Edit modal -->
+<div id="edit-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-50 flex items-center justify-center">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto fade-in">
+        <div class="p-6">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900">Edit Post</h3>
+                    <p id="edit-meta" class="text-xs text-gray-400 mt-0.5"></p>
+                </div>
+                <button onclick="closeEditModal()" class="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-400 hover:text-gray-600">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+            <!-- Image preview -->
+            <div id="edit-image" class="hidden mb-3">
+                <img id="edit-image-src" src="" alt="Post image" class="w-full max-h-48 object-contain rounded-xl border border-gray-200 bg-gray-50">
+            </div>
+            <!-- Formatting toolbar -->
+            <div class="flex items-center gap-1 mb-2 p-1.5 bg-gray-50 rounded-lg border border-gray-200">
+                <button onclick="insertAtCursor('\n\n')" class="px-2 py-1 text-xs rounded hover:bg-white hover:shadow-sm text-gray-600 transition" title="Line break">Line Break</button>
+                <div class="w-px h-5 bg-gray-300 mx-1"></div>
+                <button onclick="insertAtCursor('\n\n→ ')" class="px-2 py-1 text-xs rounded hover:bg-white hover:shadow-sm text-gray-600 transition" title="Arrow bullet">Arrow</button>
+                <button onclick="insertAtCursor('\n\n• ')" class="px-2 py-1 text-xs rounded hover:bg-white hover:shadow-sm text-gray-600 transition" title="Bullet point">Bullet</button>
+                <button onclick="undoEdit()" class="px-2 py-1 text-xs rounded hover:bg-white hover:shadow-sm text-gray-600 transition ml-auto" title="Undo all changes">Undo All</button>
+            </div>
+            <textarea id="edit-textarea" class="w-full h-72 p-4 border border-gray-200 rounded-xl text-sm leading-relaxed resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow" placeholder="Edit your post content..." spellcheck="true"></textarea>
+            <div class="flex items-center justify-between mt-2 mb-4">
+                <div class="flex items-center gap-3">
+                    <span id="edit-char-count" class="text-xs text-gray-400"></span>
+                    <span id="edit-word-count" class="text-xs text-gray-400"></span>
+                </div>
+                <span id="edit-char-warn" class="text-xs text-gray-400">Max 3,000 chars</span>
+            </div>
+            <div class="flex gap-2 justify-end">
+                <button onclick="closeEditModal()" class="btn btn-ghost btn-md">Cancel</button>
+                <button onclick="saveEdit()" class="btn btn-primary btn-md">Save Changes</button>
+                <button onclick="saveAndPostNow()" class="btn btn-success btn-md">
+                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/></svg>
+                    Save & Post Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.tab-btn { color: #6b7280; }
+.tab-btn.active { background: white; color: #111827; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+.line-clamp-4 { display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.post-card { border-left: 3px solid transparent; transition: all 0.15s ease; }
+.post-card:hover { border-left-color: #3b82f6; }
+.post-card.posted-card:hover { border-left-color: #8b5cf6; }
+.post-card.approved-card:hover { border-left-color: #10b981; }
+.post-card.rejected-card:hover { border-left-color: #ef4444; }
+.engagement-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+</style>
+
+<script>
+let currentTab = 'posted';
+let historyData = [];
+let viewingPost = null;
+let editingPostId = null;
+let originalEditContent = '';
+
+document.addEventListener('DOMContentLoaded', () => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (['approved', 'rejected', 'posted'].includes(tab)) currentTab = tab;
+    switchTab(currentTab);
+});
+
+function switchTab(tab) {
+    currentTab = tab;
+    const url = new URL(window.location);
+    url.searchParams.set('tab', tab);
+    history.replaceState({}, '', url);
+
+    document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+    document.getElementById(`tab-${tab}`).classList.add('active');
+
+    document.querySelectorAll('[id^="stat-"]').forEach(card => {
+        card.classList.remove('ring-2', 'ring-violet-300', 'ring-emerald-300', 'ring-red-300');
+    });
+    const rings = { posted: 'ring-violet-300', approved: 'ring-emerald-300', rejected: 'ring-red-300' };
+    document.getElementById(`stat-${tab}`)?.classList.add('ring-2', rings[tab]);
+
+    loadPosts(tab);
+}
+
+async function loadPosts(status) {
+    const container = document.getElementById('history-container');
+    container.innerHTML = `<div class="text-center py-16"><div class="inline-flex items-center gap-2 text-gray-400"><svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Loading...</div></div>`;
+
+    try {
+        const res = await fetch(`/api/history?status=${status}&limit=100`);
+        historyData = await res.json();
+        document.getElementById('post-count').textContent = `${historyData.length} post${historyData.length !== 1 ? 's' : ''}`;
+        document.getElementById('searchInput').value = '';
+
+        if (historyData.length === 0) {
+            const msgs = {
+                approved: { icon: '5 13l4 4L19 7', title: 'No approved posts yet', sub: 'Approved posts waiting to be published will appear here' },
+                rejected: { icon: '6 18L18 6M6 6l12 12', title: 'No rejected posts', sub: 'Posts you reject from the queue will show here' },
+                posted: { icon: '7 11l5-5m0 0l5 5m-5-5v12', title: 'No posts published yet', sub: 'Published posts with engagement metrics will appear here' },
+            };
+            const m = msgs[status];
+            container.innerHTML = `<div class="text-center py-20"><div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M${m.icon}"/></svg></div><p class="text-gray-500 font-medium">${m.title}</p><p class="text-gray-400 text-sm mt-1">${m.sub}</p></div>`;
+            return;
+        }
+
+        renderPosts(historyData, status);
+    } catch (err) {
+        container.innerHTML = `<div class="text-center py-16"><p class="text-red-500 font-medium">Failed to load posts</p><p class="text-gray-400 text-sm mt-1">Is the server running?</p></div>`;
+    }
+}
+
+function filterPosts() {
+    const query = document.getElementById('searchInput').value.toLowerCase().trim();
+    if (!query) {
+        renderPosts(historyData, currentTab);
+        document.getElementById('post-count').textContent = `${historyData.length} post${historyData.length !== 1 ? 's' : ''}`;
+        return;
+    }
+    const filtered = historyData.filter(p =>
+        (p.content || '').toLowerCase().includes(query) ||
+        (p.topic || '').toLowerCase().includes(query) ||
+        (p.template_name || '').toLowerCase().includes(query)
+    );
+    renderPosts(filtered, currentTab);
+    document.getElementById('post-count').textContent = `${filtered.length} of ${historyData.length}`;
+}
+
+function renderPosts(posts, status) {
+    const container = document.getElementById('history-container');
+    if (posts.length === 0) {
+        container.innerHTML = `<div class="text-center py-12 text-gray-400 text-sm">No posts match your search</div>`;
+        return;
+    }
+
+    container.innerHTML = posts.map((post, i) => {
+        const cardClass = status === 'posted' ? 'posted-card' : status === 'approved' ? 'approved-card' : 'rejected-card';
+        const statusBadge = status === 'posted'
+            ? '<span class="badge bg-violet-50 text-violet-700 border border-violet-200">Published</span>'
+            : status === 'approved'
+            ? '<span class="badge bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>'
+            : '<span class="badge bg-red-50 text-red-600 border border-red-200">Rejected</span>';
+
+        const date = status === 'posted' ? post.posted_at : post.created_at;
+        const timeAgo = getTimeAgo(date);
+
+        // Engagement pills for posted
+        let engagementHtml = '';
+        if (status === 'posted') {
+            const total = (post.likes || 0) + (post.comments || 0) + (post.shares || 0);
+            engagementHtml = `
+                <div class="flex items-center gap-2 mt-3">
+                    <span class="engagement-pill bg-blue-50 text-blue-700">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M2 20h2c.55 0 1-.45 1-1v-9c0-.55-.45-1-1-1H2v11zm19.83-7.12c.11-.25.17-.52.17-.8V11c0-1.1-.9-2-2-2h-5.5l.92-4.65c.05-.22.02-.46-.08-.66-.23-.45-.52-.86-.88-1.22L14 2 7.59 8.41C7.21 8.79 7 9.3 7 9.83v7.84C7 18.95 8.05 20 9.34 20h8.11c.7 0 1.36-.37 1.72-.97l2.66-6.15z"/></svg>
+                        ${post.likes || 0}
+                    </span>
+                    <span class="engagement-pill bg-emerald-50 text-emerald-700">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18z"/></svg>
+                        ${post.comments || 0}
+                    </span>
+                    <span class="engagement-pill bg-violet-50 text-violet-700">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/></svg>
+                        ${post.shares || 0}
+                    </span>
+                    ${total > 0 ? `<span class="text-xs text-gray-400 ml-1">${total} total</span>` : ''}
+                </div>`;
+        }
+
+        // Virality mini badge
+        let viralityHtml = '';
+        if (post.virality_score) {
+            const vColor = post.virality_score >= 70 ? 'amber' : post.virality_score >= 40 ? 'blue' : 'gray';
+            viralityHtml = `<span class="badge bg-${vColor}-50 text-${vColor}-700 border border-${vColor}-200 text-[11px]">${post.virality_score}/100</span>`;
+        }
+
+        // Media badge
+        let mediaBadge = '';
+        if (post.has_video) mediaBadge = '<span class="badge bg-pink-50 text-pink-600 border border-pink-200 text-[11px]">GIF</span>';
+        else if (post.has_image) mediaBadge = '<span class="badge bg-purple-50 text-purple-600 border border-purple-200 text-[11px]">Image</span>';
+
+        // Rejection reason
+        let rejectionHtml = '';
+        if (post.rejection_reason && status === 'rejected') {
+            rejectionHtml = `<div class="mt-2 px-3 py-2 bg-red-50/50 rounded-lg"><p class="text-xs text-red-500"><span class="font-medium">Reason:</span> ${esc(post.rejection_reason)}</p></div>`;
+        }
+
+        // Action buttons
+        let actionsHtml = '';
+        if (status === 'approved') {
+            actionsHtml = `
+                <div class="flex items-center gap-2">
+                    <button onclick="event.stopPropagation(); openEditModal(${post.id})" class="btn btn-ghost btn-sm">Edit</button>
+                    <button onclick="event.stopPropagation(); copyContent(${post.id})" class="btn btn-ghost btn-sm">Copy</button>
+                    <button onclick="event.stopPropagation(); postNow(${post.id}, this)" class="btn btn-primary btn-sm">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/></svg>
+                        Post Now
+                    </button>
+                </div>`;
+        } else if (status === 'posted') {
+            actionsHtml = `
+                <div class="flex items-center gap-2">
+                    <button onclick="event.stopPropagation(); copyContent(${post.id})" class="btn btn-ghost btn-sm">Copy</button>
+                    <button onclick="event.stopPropagation(); repost(${post.id}, this)" class="btn btn-sm" style="background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                        Repost
+                    </button>
+                </div>`;
+        } else {
+            actionsHtml = `<button onclick="event.stopPropagation(); copyContent(${post.id})" class="btn btn-ghost btn-sm">Copy</button>`;
+        }
+
+        // First line as hook preview
+        const firstLine = (post.content || '').split('\n').filter(l => l.trim())[0] || '';
+
+        return `
+        <div class="glass-card post-card ${cardClass} p-6 fade-in cursor-pointer" onclick="openViewModal(${post.id})" style="animation-delay: ${Math.min(i, 10) * 30}ms">
+            <div class="flex items-start gap-4">
+                <!-- Content -->
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap mb-2">
+                        ${statusBadge}
+                        ${viralityHtml}
+                        ${mediaBadge}
+                        <span class="text-xs text-gray-400">${post.word_count || 0} words</span>
+                        ${post.topic ? `<span class="text-xs text-gray-400 bg-gray-50 px-2 py-0.5 rounded-md">${esc(post.topic)}</span>` : ''}
+                    </div>
+
+                    <!-- Hook line (bold) + body preview -->
+                    <p class="text-sm font-semibold text-gray-900 mb-1">${esc(firstLine)}</p>
+                    <p class="text-[13px] text-gray-500 leading-relaxed line-clamp-4 whitespace-pre-wrap">${esc(post.content.substring(firstLine.length).trim())}</p>
+
+                    ${rejectionHtml}
+                    ${engagementHtml}
+
+                    <!-- Footer -->
+                    <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                        <span class="text-xs text-gray-400" title="${formatDate(date)}">${timeAgo}</span>
+                        ${post.scheduled_time ? `<span class="text-xs text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">Scheduled: ${formatDate(post.scheduled_time)}</span>` : ''}
+                        ${actionsHtml}
+                    </div>
+                </div>
+
+                <!-- Thumbnail -->
+                ${post.has_image && post.image_path ? `
+                <div class="flex-shrink-0 hidden sm:block">
+                    <img src="${esc(post.image_path)}" alt="" loading="lazy" class="w-28 h-28 object-cover rounded-xl border border-gray-200">
+                </div>` : ''}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+/* ── View modal ──────────────────────────────────────────── */
+
+function openViewModal(id) {
+    const post = historyData.find(p => p.id === id);
+    if (!post) return;
+    viewingPost = post;
+
+    document.getElementById('view-meta').textContent =
+        `${post.template_name || 'Unknown template'} · ${post.topic || 'No topic'} · Post #${post.id}`;
+    document.getElementById('view-content').textContent = post.content;
+
+    const wc = post.content.trim().split(/\s+/).length;
+    document.getElementById('view-word-count').textContent = `${wc} words`;
+    document.getElementById('view-char-count').textContent = `${post.content.length} chars`;
+
+    // Image
+    const imageEl = document.getElementById('view-image');
+    if (post.has_image && post.image_path) {
+        document.getElementById('view-image-src').src = post.image_path;
+        imageEl.classList.remove('hidden');
+    } else {
+        imageEl.classList.add('hidden');
+    }
+
+    // Virality
+    const viralityEl = document.getElementById('view-virality');
+    if (post.virality_score) {
+        document.getElementById('view-virality-score').textContent = post.virality_score;
+        document.getElementById('view-virality-label').textContent = (post.virality_performance || '').replace(/^\w/, c => c.toUpperCase());
+        const circ = 2 * Math.PI * 20;
+        document.getElementById('view-virality-ring').style.strokeDashoffset = circ - (post.virality_score / 100) * circ;
+        viralityEl.classList.remove('hidden');
+    } else {
+        viralityEl.classList.add('hidden');
+    }
+
+    // Rejection
+    const rejEl = document.getElementById('view-rejection');
+    if (post.rejection_reason) {
+        document.getElementById('view-rejection-text').textContent = post.rejection_reason;
+        rejEl.classList.remove('hidden');
+    } else {
+        rejEl.classList.add('hidden');
+    }
+
+    // Engagement
+    const engEl = document.getElementById('view-engagement');
+    if (post.status === 'posted') {
+        document.getElementById('view-likes').textContent = post.likes || 0;
+        document.getElementById('view-comments').textContent = post.comments || 0;
+        document.getElementById('view-shares').textContent = post.shares || 0;
+        engEl.classList.remove('hidden');
+    } else {
+        engEl.classList.add('hidden');
+    }
+
+    // Actions
+    const actEl = document.getElementById('view-actions');
+    if (post.status === 'approved' || post.status === 'scheduled') {
+        actEl.innerHTML = `
+            <button onclick="copyPostContent()" class="btn btn-ghost btn-md">Copy</button>
+            <button onclick="closeViewModal(); openEditModal(${post.id})" class="btn btn-ghost btn-md">Edit</button>
+            <button onclick="closeViewModal(); postNow(${post.id})" class="btn btn-primary btn-md">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11l5-5m0 0l5 5m-5-5v12"/></svg>
+                Post Now
+            </button>`;
+    } else if (post.status === 'posted') {
+        actEl.innerHTML = `
+            <button onclick="copyPostContent()" class="btn btn-ghost btn-md">Copy</button>
+            <button onclick="closeViewModal(); repost(${post.id})" class="btn btn-md" style="background:#f5f3ff;color:#7c3aed;border:1px solid #ddd6fe;">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Repost
+            </button>
+            <button onclick="closeViewModal()" class="btn btn-primary btn-md">Close</button>`;
+    } else {
+        actEl.innerHTML = `
+            <button onclick="copyPostContent()" class="btn btn-ghost btn-md">Copy</button>
+            <button onclick="closeViewModal()" class="btn btn-primary btn-md">Close</button>`;
+    }
+
+    document.getElementById('view-modal').classList.remove('hidden');
+}
+
+function closeViewModal() { viewingPost = null; document.getElementById('view-modal').classList.add('hidden'); }
+function copyPostContent() { if (!viewingPost) return; navigator.clipboard.writeText(viewingPost.content).then(() => showToast('Copied to clipboard')); }
+function copyContent(id) { const p = historyData.find(p => p.id === id); if (p) navigator.clipboard.writeText(p.content).then(() => showToast('Copied to clipboard')); }
+
+/* ── Post Now ────────────────────────────────────────────── */
+
+async function postNow(id, btn) {
+    if (!confirm('Post this to LinkedIn right now?')) return;
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Posting...'; }
+    try {
+        const res = await fetch(`/api/post-now/${id}`, {method: 'POST'});
+        if (res.ok) { showToast('Posted to LinkedIn!'); loadPosts(currentTab); }
+        else { const d = await res.json().catch(() => ({})); showToast(d.error || 'Failed to post', 'error'); }
+    } catch { showToast('Failed to post. Check connection.', 'error'); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = origHtml; } }
+}
+
+/* ── Repost ───────────────────────────────────────────────── */
+
+async function repost(id, btn) {
+    const origHtml = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Reposting...'; }
+    try {
+        const res = await fetch(`/api/queue/${id}/repost`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`Requeued as Post #${data.new_id} — check the Queue to review and post`);
+        } else {
+            showToast(data.error || 'Failed to repost', 'error');
+        }
+    } catch { showToast('Failed to repost', 'error'); }
+    finally { if (btn) { btn.disabled = false; btn.innerHTML = origHtml; } }
+}
+
+/* ── Edit modal ──────────────────────────────────────────── */
+
+function openEditModal(id) {
+    const post = historyData.find(p => p.id === id);
+    if (!post) return;
+    editingPostId = id;
+    const ta = document.getElementById('edit-textarea');
+    ta.value = post.content;
+    originalEditContent = post.content;
+    document.getElementById('edit-meta').textContent = `${post.template_name || 'Unknown'} · Post #${post.id}`;
+
+    const editImg = document.getElementById('edit-image');
+    if (post.has_image && post.image_path) { document.getElementById('edit-image-src').src = post.image_path; editImg.classList.remove('hidden'); }
+    else { editImg.classList.add('hidden'); }
+
+    document.getElementById('edit-modal').classList.remove('hidden');
+    updateEditStats();
+    ta.focus();
+}
+
+function closeEditModal() {
+    const ta = document.getElementById('edit-textarea');
+    if (editingPostId && ta.value !== originalEditContent) { if (!confirm('Discard unsaved changes?')) return; }
+    editingPostId = null; originalEditContent = '';
+    document.getElementById('edit-modal').classList.add('hidden');
+}
+
+function updateEditStats() {
+    const text = document.getElementById('edit-textarea').value;
+    const cc = text.length, wc = text.trim() ? text.trim().split(/\s+/).length : 0;
+    const nl = (text.match(/\n/g) || []).length;
+    document.getElementById('edit-char-count').textContent = `${cc.toLocaleString()} chars`;
+    document.getElementById('edit-word-count').textContent = `${wc} words`;
+    const warn = document.getElementById('edit-char-warn');
+    if (cc > 3000) { warn.textContent = `${cc - 3000} over limit!`; warn.className = 'text-xs text-red-500 font-medium'; }
+    else if (nl > 34) { warn.textContent = `${nl} newlines — will be truncated! (max 34)`; warn.className = 'text-xs text-red-500 font-medium'; }
+    else if (nl > 28) { warn.textContent = `${nl} newlines — risk of truncation`; warn.className = 'text-xs text-amber-500'; }
+    else if (cc > 2700) { warn.textContent = `${3000 - cc} chars remaining`; warn.className = 'text-xs text-amber-500'; }
+    else { warn.textContent = `${nl} line breaks · Max 3,000 chars`; warn.className = 'text-xs text-gray-400'; }
+}
+
+const _eta = document.getElementById('edit-textarea');
+if (_eta) {
+    _eta.addEventListener('input', updateEditStats);
+    _eta.addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); saveEdit(); } });
+}
+
+async function saveEdit() {
+    const content = document.getElementById('edit-textarea').value;
+    if (content.length > 3000) { showToast('Post exceeds 3,000 character limit', 'error'); return; }
+    const nl = (content.match(/\n/g) || []).length;
+    if (nl > 34) { showToast(`Too many line breaks (${nl}/34 max)`, 'error'); return; }
+    const res = await fetch(`/api/queue/${editingPostId}/edit`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content}) });
+    if (res.ok) { originalEditContent = content; editingPostId = null; document.getElementById('edit-modal').classList.add('hidden'); loadPosts(currentTab); showToast('Post updated'); }
+    else { const d = await res.json().catch(() => ({})); showToast(d.error || 'Failed to save', 'error'); }
+}
+
+async function saveAndPostNow() {
+    const content = document.getElementById('edit-textarea').value;
+    if (content.length > 3000) { showToast('Post exceeds 3,000 character limit', 'error'); return; }
+    const editRes = await fetch(`/api/queue/${editingPostId}/edit`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content}) });
+    if (!editRes.ok) { const d = await editRes.json().catch(() => ({})); showToast(d.error || 'Failed to save', 'error'); return; }
+    if (!confirm('Post this to LinkedIn right now?')) return;
+    const postRes = await fetch(`/api/post-now/${editingPostId}`, {method: 'POST'});
+    if (postRes.ok) { originalEditContent = content; editingPostId = null; document.getElementById('edit-modal').classList.add('hidden'); showToast('Saved & posted to LinkedIn!'); loadPosts(currentTab); }
+    else { const d = await postRes.json().catch(() => ({})); showToast(d.error || 'Failed to post', 'error'); }
+}
+
+function undoEdit() { if (!originalEditContent) return; if (!confirm('Undo all changes?')) return; document.getElementById('edit-textarea').value = originalEditContent; updateEditStats(); }
+function insertAtCursor(text) { const ta = document.getElementById('edit-textarea'); const s = ta.selectionStart, e = ta.selectionEnd; ta.value = ta.value.substring(0, s) + text + ta.value.substring(e); ta.selectionStart = ta.selectionEnd = s + text.length; ta.focus(); updateEditStats(); }
+
+/* ── Keyboard shortcuts ──────────────────────────────────── */
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { if (editingPostId) closeEditModal(); else if (viewingPost) closeViewModal(); }
+});
+document.getElementById('view-modal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeViewModal(); });
+document.getElementById('edit-modal')?.addEventListener('click', (e) => { if (e.target === e.currentTarget) closeEditModal(); });
+
+/* ── Helpers ──────────────────────────────────────────────── */
+
+function esc(text) { if (!text) return ''; const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+const escapeHtml = esc;
+
+function formatDate(isoStr) {
+    if (!isoStr) return 'N/A';
+    const d = new Date(isoStr);
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return `${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+}
+
+function getTimeAgo(isoStr) {
+    if (!isoStr) return '';
+    const now = new Date(), then = new Date(isoStr);
+    const diff = Math.floor((now - then) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`;
+    return formatDate(isoStr);
+}
+</script>
+{% endblock %}

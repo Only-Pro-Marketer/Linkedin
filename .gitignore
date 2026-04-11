@@ -1,0 +1,44 @@
+# Environment
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Database
+*.db
+
+# Logs
+*.log
+
+# Generated content
+dashboard/static/images/generated/*.png
+dashboard/static/images/generated/*.gif
+dashboard/static/images/generated/*.jpg
+dashboard/static/videos/generated/*.gif
+dashboard/static/videos/generated/*.mp4
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Claude Code local settings
+.claude/

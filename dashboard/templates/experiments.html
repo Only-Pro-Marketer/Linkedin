@@ -1,0 +1,248 @@
+{% extends "base.html" %}
+{% block page_title %}Experiments{% endblock %}
+
+{% block content %}
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-8 flex-wrap gap-5">
+    <div class="flex items-center gap-3">
+        <h2 class="section-heading">Autoresearch</h2>
+        <span class="text-xs" style="color: var(--text-muted);">Karpathy-style autonomous experimentation</span>
+    </div>
+    <div class="flex items-center gap-3">
+        <button onclick="runExperiment()" id="run-btn" class="btn btn-primary btn-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Run Experiments
+        </button>
+    </div>
+</div>
+
+<!-- Summary cards -->
+<div id="summary-cards" class="grid grid-cols-2 md:grid-cols-5 gap-5 mb-8">
+    <div class="glass-card stat-card p-6 fade-in-up stagger-1">
+        <p class="stat-label">Total Experiments</p>
+        <p id="stat-total" class="stat-value">-</p>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-2">
+        <p class="stat-label">Avg Winner Score</p>
+        <p id="stat-avg-score" class="stat-value">-</p>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-3">
+        <p class="stat-label">Avg Score Spread</p>
+        <p id="stat-spread" class="stat-value">-</p>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-4">
+        <p class="stat-label">Queued Winners</p>
+        <p id="stat-queued" class="stat-value">-</p>
+    </div>
+    <div class="glass-card stat-card p-6 fade-in-up stagger-5">
+        <p class="stat-label">Calibration Delta</p>
+        <p id="stat-calibration" class="stat-value">-</p>
+    </div>
+</div>
+
+<!-- Win Rates -->
+<div id="win-rates-section" class="mb-8 hidden">
+    <h3 class="text-sm font-semibold mb-4" style="color: var(--text-secondary);">Win Rates by Parameter</h3>
+    <div id="win-rates-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+</div>
+
+<!-- Experiments list -->
+<div id="experiments-container">
+    <h3 class="text-sm font-semibold mb-4" style="color: var(--text-secondary);">Experiment History</h3>
+    <div id="experiments-empty" class="hidden glass-card">
+        <div class="empty-state">
+            <svg class="empty-state-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <p class="empty-state-title">No experiments yet</p>
+            <p class="empty-state-text">Run your first autoresearch cycle to start experimenting.</p>
+            <button onclick="runExperiment()" class="btn btn-primary btn-sm">Run First Experiment</button>
+        </div>
+    </div>
+    <div id="experiments-list" class="space-y-3"></div>
+</div>
+
+<!-- Variation detail modal -->
+<div id="variation-modal" class="modal-overlay">
+    <div class="modal-content" style="max-width: 900px; width: 95%;">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-4">
+                <h3 id="modal-title" class="text-lg font-semibold" style="color: var(--text-primary);"></h3>
+                <button onclick="closeModal()" class="btn btn-ghost btn-sm">&times;</button>
+            </div>
+            <div id="modal-body" class="grid grid-cols-1 md:grid-cols-2 gap-5"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    loadSummary();
+    loadExperiments();
+});
+
+async function loadSummary() {
+    try {
+        const res = await fetch('/api/experiments/summary');
+        const data = await res.json();
+        const s = data.summary;
+
+        document.getElementById('stat-total').textContent = s.total_experiments || 0;
+        document.getElementById('stat-avg-score').textContent = s.avg_winner_score || '-';
+        document.getElementById('stat-spread').textContent = s.avg_score_spread || '-';
+        document.getElementById('stat-queued').textContent = s.queued_winners || 0;
+        document.getElementById('stat-calibration').textContent = s.avg_calibration_delta != null ? (s.avg_calibration_delta > 0 ? '+' : '') + s.avg_calibration_delta : '-';
+
+        // Win rates
+        const wr = data.win_rates;
+        if (wr && Object.keys(wr).length > 0) {
+            document.getElementById('win-rates-section').classList.remove('hidden');
+            const grid = document.getElementById('win-rates-grid');
+            grid.innerHTML = '';
+            for (const [type, params] of Object.entries(wr)) {
+                const sorted = Object.entries(params).sort((a, b) => b[1].win_rate - a[1].win_rate);
+                const bars = sorted.map(([label, d]) => `
+                    <div class="flex items-center gap-2 mb-1.5">
+                        <span class="text-xs w-28 truncate" style="color: var(--text-secondary);" title="${label}">${label}</span>
+                        <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
+                            <div class="h-full rounded-full ${d.win_rate > 40 ? 'bg-green-500' : d.win_rate > 20 ? 'bg-blue-500' : 'bg-gray-300'}" style="width: ${Math.max(d.win_rate, 5)}%"></div>
+                        </div>
+                        <span class="text-xs font-medium w-16 text-right" style="color: var(--text-primary);">${d.win_rate}%</span>
+                        <span class="text-xs w-12 text-right" style="color: var(--text-muted);">avg ${d.avg_score}</span>
+                    </div>
+                `).join('');
+                grid.innerHTML += `
+                    <div class="glass-card p-6">
+                        <h4 class="stat-label mb-3">${type}</h4>
+                        ${bars}
+                    </div>
+                `;
+            }
+        }
+    } catch (e) {
+        console.error('Failed to load summary:', e);
+    }
+}
+
+async function loadExperiments() {
+    try {
+        const res = await fetch('/api/experiments');
+        const experiments = await res.json();
+
+        if (experiments.length === 0) {
+            document.getElementById('experiments-empty').classList.remove('hidden');
+            return;
+        }
+
+        const list = document.getElementById('experiments-list');
+        list.innerHTML = experiments.map(exp => {
+            const typeColors = {
+                hook: 'bg-purple-100 text-purple-700',
+                tone: 'bg-blue-100 text-blue-700',
+                template: 'bg-green-100 text-green-700',
+                length: 'bg-orange-100 text-orange-700',
+                angle: 'bg-pink-100 text-pink-700',
+            };
+            const typeColor = typeColors[exp.type] || 'bg-gray-100 text-gray-700';
+            const winner = exp.variations.find(v => v.is_winner);
+            const date = exp.created_at ? new Date(exp.created_at).toLocaleDateString() : '';
+
+            const variationDots = exp.variations.map(v => {
+                const score = v.virality_score || 0;
+                const color = v.is_winner ? 'bg-green-500' : score >= 65 ? 'bg-blue-400' : score >= 40 ? 'bg-yellow-400' : 'bg-gray-300';
+                return `<div class="w-6 h-6 rounded-full ${color} flex items-center justify-center text-white text-xs font-bold cursor-pointer" title="${v.label}: ${score}">${score}</div>`;
+            }).join('');
+
+            return `
+                <div class="glass-card p-6 glass-card-interactive" style="cursor: default;">
+                    <div class="flex items-start justify-between gap-5">
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="badge ${typeColor}">${exp.type}</span>
+                                <span class="text-xs" style="color: var(--text-muted);">#${exp.id}</span>
+                                <span class="text-xs" style="color: var(--text-muted);">${date}</span>
+                                ${exp.queued_post_id ? '<span class="badge badge-success">Queued</span>' : ''}
+                                ${exp.actual_engagement != null ? `<span class="badge badge-info">Actual: ${Math.round(exp.actual_engagement)}</span>` : ''}
+                            </div>
+                            <p class="text-sm truncate" style="color: var(--text-primary);">${exp.topic || ''}</p>
+                            <p class="text-xs mt-0.5 truncate" style="color: var(--text-muted);">${exp.hypothesis || ''}</p>
+                        </div>
+                        <div class="flex items-center gap-3 flex-shrink-0">
+                            <div class="flex items-center gap-1">${variationDots}</div>
+                            <div class="text-right">
+                                <p class="text-lg font-bold" style="color: var(--text-primary);">${exp.winner_score || '-'}</p>
+                                <p class="text-xs" style="color: var(--text-muted);">spread: ${exp.score_spread || 0}</p>
+                            </div>
+                            <button onclick="showVariations(${exp.id})" class="btn btn-ghost btn-sm text-xs">Details</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    } catch (e) {
+        console.error('Failed to load experiments:', e);
+    }
+}
+
+let experimentsCache = {};
+
+async function showVariations(expId) {
+    if (!experimentsCache[expId]) {
+        const res = await fetch('/api/experiments');
+        const all = await res.json();
+        all.forEach(e => experimentsCache[e.id] = e);
+    }
+    const exp = experimentsCache[expId];
+    if (!exp) return;
+
+    document.getElementById('modal-title').textContent = `Experiment #${exp.id}: ${exp.type} — ${exp.topic || ''}`;
+    const body = document.getElementById('modal-body');
+    body.innerHTML = exp.variations.map(v => `
+        <div class="glass-card p-6 ${v.is_winner ? 'ring-2 ring-green-400' : ''}" style="${v.is_winner ? 'background: var(--success-bg);' : ''}">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold" style="color: ${v.is_winner ? '#15803d' : 'var(--text-primary)'};">
+                    ${v.label} ${v.is_winner ? '(Winner)' : ''}
+                </span>
+                <span class="text-lg font-bold ${v.virality_score >= 65 ? 'score-viral' : v.virality_score >= 40 ? 'score-medium' : 'score-low'}">${v.virality_score || 0}</span>
+            </div>
+            <div class="flex gap-2 text-xs mb-2" style="color: var(--text-muted);">
+                <span>${v.hook_type || ''}</span>
+                <span>${v.tone || ''}</span>
+                <span>${v.word_count || 0}w</span>
+            </div>
+            <pre class="text-xs whitespace-pre-wrap rounded-xl p-4 max-h-64 overflow-auto" style="color: var(--text-secondary); background: var(--surface-primary); border: 1px solid var(--border-subtle);">${v.content || ''}</pre>
+        </div>
+    `).join('');
+
+    document.getElementById('variation-modal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('variation-modal').classList.remove('show');
+}
+
+async function runExperiment() {
+    const btn = document.getElementById('run-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="4" class="opacity-25"/><path d="M4 12a8 8 0 018-8" stroke-width="4" class="opacity-75"/></svg> Running...';
+
+    try {
+        const res = await fetch('/api/autoresearch/run', { method: 'POST' });
+        const data = await res.json();
+        alert(`Autoresearch complete: ${data.experiments_run} experiments run`);
+        loadSummary();
+        loadExperiments();
+    } catch (e) {
+        alert('Autoresearch failed: ' + e.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Run Experiments';
+    }
+}
+
+// ESC to close modal
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeModal();
+});
+</script>
+
+{% endblock %}

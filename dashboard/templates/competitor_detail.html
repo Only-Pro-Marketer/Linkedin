@@ -1,0 +1,818 @@
+{% extends "base.html" %}
+{% block page_title %}Competitor Detail{% endblock %}
+
+{% block content %}
+<!-- Loading state -->
+<div id="loading-state" class="text-center py-20">
+    <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+    <p class="text-gray-400 text-sm">Loading competitor data...</p>
+</div>
+
+<!-- Main content (hidden until loaded) -->
+<div id="main-content" class="hidden">
+
+<!-- Back + Header -->
+<div class="flex items-center gap-3 mb-6">
+    <a href="/competitors" class="w-8 h-8 rounded-lg bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition-colors">
+        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </a>
+    <span class="text-sm text-gray-400">Competitors</span>
+    <svg class="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    <span class="text-sm font-medium text-gray-700" id="breadcrumb-name">--</span>
+</div>
+
+<!-- Profile Card -->
+<div class="glass-card p-6 mb-6">
+    <div class="flex items-start justify-between">
+        <div class="flex items-center gap-4">
+            <div id="profile-avatar" class="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center overflow-hidden" style="aspect-ratio: 1 / 1; flex-shrink: 0;">
+                <span class="text-xl font-bold text-blue-700" id="avatar-initials">--</span>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-gray-900" id="profile-name">--</h1>
+                <p class="text-sm text-gray-500 mt-0.5" id="profile-headline"></p>
+                <div class="flex items-center gap-3 mt-2">
+                    <span class="text-xs text-gray-400" id="profile-followers"></span>
+                    <span class="text-xs text-gray-400" id="profile-niche"></span>
+                    <span class="text-xs text-gray-400" id="profile-frequency"></span>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center gap-2">
+            <a id="linkedin-link" href="#" target="_blank" class="btn btn-ghost btn-sm hidden">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg>
+                LinkedIn Profile
+            </a>
+            <button onclick="scrapeThis()" id="btn-scrape" class="btn btn-sm" style="background:#7c3aed;color:white">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                Scrape Now
+            </button>
+        </div>
+    </div>
+    <p class="text-sm text-gray-400 mt-3" id="profile-notes"></p>
+    <div class="flex items-center gap-3 mt-3" id="scrape-info">
+        <span class="text-[11px] text-gray-400" id="profile-scrape-status"></span>
+        <span class="text-[11px] text-gray-400" id="profile-tracked-since"></span>
+    </div>
+</div>
+
+<!-- Stats Row -->
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-5 mb-8">
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-1">
+        <p class="stat-value" style="font-size:28px" id="stat-posts">--</p>
+        <p class="stat-label mt-0.5">Posts</p>
+    </div>
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-2">
+        <p class="stat-value" style="font-size:28px" id="stat-avg-likes">--</p>
+        <p class="stat-label mt-0.5">Avg Likes</p>
+    </div>
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-3">
+        <p class="stat-value" style="font-size:28px" id="stat-avg-comments">--</p>
+        <p class="stat-label mt-0.5">Avg Comments</p>
+    </div>
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-4">
+        <p class="stat-value" style="font-size:28px" id="stat-avg-shares">--</p>
+        <p class="stat-label mt-0.5">Avg Shares</p>
+    </div>
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-5">
+        <p class="stat-value" style="font-size:28px" id="stat-avg-eng">--</p>
+        <p class="stat-label mt-0.5">Avg Engagement</p>
+    </div>
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-6">
+        <p class="stat-value" style="font-size:28px" id="stat-images">--</p>
+        <p class="stat-label mt-0.5">With Image</p>
+    </div>
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-7">
+        <p class="stat-value" style="font-size:28px" id="stat-videos">--</p>
+        <p class="stat-label mt-0.5">With Video</p>
+    </div>
+    <div class="glass-card stat-card p-6 text-center fade-in-up stagger-8">
+        <p class="stat-value" style="font-size:28px" id="stat-analyzed">--</p>
+        <p class="stat-label mt-0.5">AI Analyzed</p>
+    </div>
+</div>
+
+<!-- Two Column: Patterns + Top Posts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+
+    <!-- Content Patterns -->
+    <div class="glass-card p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-gray-900">Content Patterns</h3>
+            <span id="patterns-context" class="text-[10px] text-gray-400"></span>
+        </div>
+
+        <!-- Hook Styles -->
+        <div class="mb-5">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Hook Styles Used</p>
+            <div id="hook-bars" class="space-y-2">
+                <p class="text-xs text-gray-300">No data yet — AI analyze posts to see patterns</p>
+            </div>
+        </div>
+
+        <!-- Formats -->
+        <div class="mb-5">
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Content Formats</p>
+            <div id="format-bars" class="space-y-2">
+                <p class="text-xs text-gray-300">No data yet — AI analyze posts to see patterns</p>
+            </div>
+        </div>
+
+        <!-- Topics -->
+        <div>
+            <p class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Top Topics</p>
+            <div id="topic-tags" class="flex flex-wrap gap-1.5">
+                <p class="text-xs text-gray-300">No data yet — AI analyze posts to see topics</p>
+            </div>
+        </div>
+
+        <!-- Analyze more CTA -->
+        <div id="analyze-cta" class="hidden mt-4 pt-3 border-t border-gray-100">
+            <button onclick="analyzeAllPosts()" id="btn-analyze-all" class="btn btn-sm text-xs w-full justify-center" style="background:#06b6d4;color:white">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                AI Analyze Remaining Posts
+            </button>
+        </div>
+    </div>
+
+    <!-- Best Performing -->
+    <div class="glass-card p-6">
+        <h3 class="text-sm font-semibold text-gray-900 mb-4">Top Performing Posts</h3>
+        <div id="top-posts-list" class="space-y-3">
+            <p class="text-xs text-gray-300">No posts yet</p>
+        </div>
+    </div>
+</div>
+
+<!-- Performance by Style -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <div class="glass-card p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-gray-900">Engagement by Hook Style</h3>
+            <span id="hook-perf-context" class="text-[10px] text-gray-400"></span>
+        </div>
+        <div id="hook-perf-list" class="space-y-2">
+            <p class="text-xs text-gray-300">No data yet</p>
+        </div>
+    </div>
+    <div class="glass-card p-6">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-sm font-semibold text-gray-900">Engagement by Format</h3>
+            <span id="format-perf-context" class="text-[10px] text-gray-400"></span>
+        </div>
+        <div id="format-perf-list" class="space-y-2">
+            <p class="text-xs text-gray-300">No data yet</p>
+        </div>
+    </div>
+</div>
+
+<!-- Key Takeaways -->
+<div class="glass-card p-6 mb-6" id="takeaways-section">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-900">Key Takeaways & Lessons <span class="text-gray-400 font-normal" id="takeaways-count-label"></span></h3>
+    </div>
+    <div id="takeaways-list" class="space-y-2">
+        <p class="text-xs text-gray-300">No AI analysis yet. Scrape and analyze posts to see takeaways.</p>
+    </div>
+    <!-- Takeaways Pagination -->
+    <div id="takeaways-pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 hidden">
+        <p class="text-xs text-gray-400" id="takeaways-page-info">Page 1 of 1</p>
+        <div class="flex items-center gap-1" id="takeaways-page-buttons"></div>
+    </div>
+</div>
+
+<!-- All Posts (full list) -->
+<div class="glass-card p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+        <h3 class="text-sm font-semibold text-gray-900">All Posts <span class="text-gray-400 font-normal" id="posts-count-label"></span></h3>
+        <div class="flex items-center gap-2">
+            <select id="sort-posts" onchange="sortAndRender()" class="text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white outline-none">
+                <option value="engagement">Sort: Engagement</option>
+                <option value="likes">Sort: Likes</option>
+                <option value="comments">Sort: Comments</option>
+                <option value="date_desc" selected>Sort: Newest</option>
+                <option value="date_asc">Sort: Oldest</option>
+            </select>
+            <select id="filter-hook" onchange="sortAndRender()" class="text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white outline-none">
+                <option value="">All Hook Styles</option>
+            </select>
+            <select id="filter-format" onchange="sortAndRender()" class="text-xs px-2 py-1.5 border border-gray-200 rounded-lg bg-white outline-none">
+                <option value="">All Formats</option>
+            </select>
+        </div>
+    </div>
+    <div id="all-posts-list" class="space-y-4">
+        <p class="text-xs text-gray-300 text-center py-8">No posts yet</p>
+    </div>
+    <!-- Pagination -->
+    <div id="pagination" class="flex items-center justify-between mt-4 pt-4 border-t border-gray-100 hidden">
+        <p class="text-xs text-gray-400" id="page-info">Page 1 of 1</p>
+        <div class="flex items-center gap-1" id="page-buttons"></div>
+    </div>
+</div>
+
+</div> <!-- end main-content -->
+
+<style>
+.bar-fill { height: 22px; border-radius: 4px; transition: width 0.5s ease; display: flex; align-items: center; padding: 0 8px; }
+.perf-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid #f3f4f6; }
+.perf-row:last-child { border-bottom: none; }
+.post-full-card { transition: all 0.15s ease; }
+.post-full-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+.line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+.line-clamp-6 { display:-webkit-box; -webkit-line-clamp:6; -webkit-box-orient:vertical; overflow:hidden; }
+</style>
+
+<script>
+const COMPETITOR_ID = {{ competitor_id }};
+const POSTS_PER_PAGE = 10;
+const TAKEAWAYS_PER_PAGE = 10;
+let detailData = null;
+let allPosts = [];
+let filteredPosts = [];
+let currentPage = 1;
+let takeawaysPage = 1;
+
+document.addEventListener('DOMContentLoaded', loadDetail);
+
+async function loadDetail() {
+    try {
+        const res = await fetch(`/api/competitors/${COMPETITOR_ID}/detail`);
+        if (!res.ok) throw new Error('Failed to load');
+        detailData = await res.json();
+        allPosts = detailData.posts || [];
+        renderProfile();
+        renderStats();
+        renderPatterns();
+        renderTopPosts();
+        renderPerformance();
+        renderTakeaways();
+        populateFilters();
+        sortAndRender();
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('main-content').classList.remove('hidden');
+    } catch(e) {
+        document.getElementById('loading-state').innerHTML = `
+            <p class="text-red-500 font-medium">Failed to load competitor data</p>
+            <a href="/competitors" class="btn btn-ghost btn-sm mt-4">Back to Competitors</a>`;
+    }
+}
+
+// ── Profile ──
+function renderProfile() {
+    const p = detailData.profile;
+    document.getElementById('breadcrumb-name').textContent = p.name;
+    document.getElementById('profile-name').textContent = p.name;
+
+    if (p.profile_picture) {
+        document.getElementById('profile-avatar').innerHTML = `<img src="${p.profile_picture}" class="w-16 h-16 rounded-full object-cover" style="aspect-ratio:1/1;" alt="${esc(p.name)}">`;
+    } else {
+        const initials = p.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+        document.getElementById('avatar-initials').textContent = initials;
+    }
+
+    document.getElementById('profile-headline').textContent = p.headline || '';
+    document.getElementById('profile-followers').textContent = p.follower_count ? fmtNum(p.follower_count) + ' followers' : '';
+    document.getElementById('profile-niche').textContent = p.niche || '';
+    document.getElementById('profile-frequency').textContent = p.posting_frequency ? p.posting_frequency : '';
+    document.getElementById('profile-notes').textContent = p.notes || '';
+
+    if (p.linkedin_url) {
+        const link = document.getElementById('linkedin-link');
+        link.href = p.linkedin_url;
+        link.classList.remove('hidden');
+    }
+
+    const scrapeStatus = p.scrape_status === 'success'
+        ? `Last scraped ${p.last_scraped_at ? timeAgo(p.last_scraped_at) : 'recently'}`
+        : p.scrape_status === 'failed' ? 'Scrape failed' : 'Not scraped yet';
+    document.getElementById('profile-scrape-status').textContent = scrapeStatus;
+    document.getElementById('profile-tracked-since').textContent = p.created_at ? 'Tracking since ' + new Date(p.created_at).toLocaleDateString() : '';
+}
+
+// ── Stats ──
+function renderStats() {
+    const s = detailData.stats;
+    document.getElementById('stat-posts').textContent = s.total_posts;
+    document.getElementById('stat-avg-likes').textContent = s.avg_likes;
+    document.getElementById('stat-avg-comments').textContent = s.avg_comments;
+    document.getElementById('stat-avg-shares').textContent = s.avg_shares;
+    document.getElementById('stat-avg-eng').textContent = s.avg_engagement;
+    document.getElementById('stat-images').textContent = s.posts_with_image;
+    document.getElementById('stat-videos').textContent = s.posts_with_video;
+    document.getElementById('stat-analyzed').textContent = `${s.analyzed_count}/${s.total_posts}`;
+}
+
+// ── Content Patterns ──
+function renderPatterns() {
+    const pat = detailData.patterns;
+    const analyzed = detailData.stats.analyzed_count;
+    const total = detailData.stats.total_posts;
+
+    // Show context label
+    if (analyzed > 0 && analyzed < total) {
+        document.getElementById('patterns-context').textContent = `Based on ${analyzed} of ${total} analyzed`;
+    } else if (analyzed === total && total > 0) {
+        document.getElementById('patterns-context').textContent = `All ${total} posts analyzed`;
+    }
+
+    // Show "Analyze remaining" CTA if not all analyzed
+    if (analyzed < total) {
+        document.getElementById('analyze-cta').classList.remove('hidden');
+        const remaining = total - analyzed;
+        document.getElementById('btn-analyze-all').innerHTML = `
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            AI Analyze Remaining ${remaining} Posts`;
+    }
+
+    // Hook style bars
+    if (pat.hook_styles.length) {
+        const maxCount = pat.hook_styles[0][1];
+        document.getElementById('hook-bars').innerHTML = pat.hook_styles.map(([style, count]) => {
+            const pct = Math.round((count / maxCount) * 100);
+            return `<div class="flex items-center gap-2">
+                <span class="text-[11px] text-gray-500 w-28 text-right truncate" title="${fmtLabel(style)}">${fmtLabel(style)}</span>
+                <div class="flex-1 bg-gray-100 rounded overflow-hidden h-[22px]">
+                    <div class="bar-fill bg-violet-500" style="width:${pct}%">
+                        <span class="text-[10px] text-white font-medium">${count}</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Format bars
+    if (pat.formats.length) {
+        const maxCount = pat.formats[0][1];
+        document.getElementById('format-bars').innerHTML = pat.formats.map(([fmt, count]) => {
+            const pct = Math.round((count / maxCount) * 100);
+            return `<div class="flex items-center gap-2">
+                <span class="text-[11px] text-gray-500 w-28 text-right truncate" title="${fmtLabel(fmt)}">${fmtLabel(fmt)}</span>
+                <div class="flex-1 bg-gray-100 rounded overflow-hidden h-[22px]">
+                    <div class="bar-fill bg-blue-500" style="width:${pct}%">
+                        <span class="text-[10px] text-white font-medium">${count}</span>
+                    </div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Topic tags
+    if (pat.topics.length) {
+        document.getElementById('topic-tags').innerHTML = pat.topics.map(([topic, count]) =>
+            `<span class="badge bg-gray-100 text-gray-600 text-[11px]">${esc(topic)} <span class="text-gray-400 ml-1">${count}</span></span>`
+        ).join('');
+    }
+}
+
+// ── Top Posts ──
+function renderTopPosts() {
+    const top = detailData.top_posts;
+    if (!top.length) return;
+
+    document.getElementById('top-posts-list').innerHTML = top.map((p, i) => `
+        <div class="flex items-start gap-3 pb-3 ${i < top.length - 1 ? 'border-b border-gray-100' : ''}">
+            <div class="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 ${i === 0 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-500'} text-xs font-bold">${i + 1}</div>
+            <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-700 line-clamp-3 whitespace-pre-line">${esc(p.content)}</p>
+                <div class="flex items-center gap-3 mt-1.5">
+                    <span class="text-[11px] text-blue-600 font-medium">${p.likes} likes</span>
+                    <span class="text-[11px] text-emerald-600 font-medium">${p.comments} cmts</span>
+                    <span class="text-[11px] text-violet-600 font-medium">${p.shares} shares</span>
+                    ${p.hook_style ? `<span class="badge bg-violet-50 text-violet-600 text-[9px]">${fmtLabel(p.hook_style)}</span>` : ''}
+                    ${p.content_format ? `<span class="badge bg-blue-50 text-blue-600 text-[9px]">${fmtLabel(p.content_format)}</span>` : ''}
+                    ${p.post_url ? `<a href="${p.post_url}" target="_blank" class="text-[10px] text-blue-500 hover:text-blue-700">View</a>` : ''}
+                </div>
+            </div>
+            <div class="text-right flex-shrink-0">
+                <p class="text-lg font-bold ${i === 0 ? 'text-amber-600' : 'text-gray-700'}">${p.total_engagement}</p>
+                <p class="text-[9px] text-gray-400 uppercase">Total Eng</p>
+            </div>
+        </div>
+    `).join('');
+}
+
+// ── Performance by Style ──
+function renderPerformance() {
+    const hookPerf = detailData.patterns.hook_performance;
+    const fmtPerf = detailData.patterns.format_performance;
+    const analyzed = detailData.stats.analyzed_count;
+    const total = detailData.stats.total_posts;
+
+    // Context labels
+    if (analyzed > 0 && analyzed < total) {
+        const ctx = `${analyzed} of ${total} posts`;
+        document.getElementById('hook-perf-context').textContent = ctx;
+        document.getElementById('format-perf-context').textContent = ctx;
+    }
+
+    if (hookPerf.length) {
+        const max = hookPerf[0].avg_engagement;
+        document.getElementById('hook-perf-list').innerHTML = hookPerf.map(h => {
+            const pct = Math.round((h.avg_engagement / max) * 100);
+            return `<div class="perf-row">
+                <span class="text-[11px] text-gray-600 w-28 truncate font-medium">${fmtLabel(h.style)}</span>
+                <div class="flex-1 bg-gray-100 rounded overflow-hidden h-5">
+                    <div class="bar-fill bg-gradient-to-r from-violet-400 to-violet-600" style="width:${pct}%">
+                        <span class="text-[10px] text-white font-medium">${h.avg_engagement}</span>
+                    </div>
+                </div>
+                <span class="text-[10px] text-gray-400 w-14 text-right">${h.count} posts</span>
+            </div>`;
+        }).join('');
+    }
+
+    if (fmtPerf.length) {
+        const max = fmtPerf[0].avg_engagement;
+        document.getElementById('format-perf-list').innerHTML = fmtPerf.map(f => {
+            const pct = Math.round((f.avg_engagement / max) * 100);
+            return `<div class="perf-row">
+                <span class="text-[11px] text-gray-600 w-28 truncate font-medium">${fmtLabel(f.format)}</span>
+                <div class="flex-1 bg-gray-100 rounded overflow-hidden h-5">
+                    <div class="bar-fill bg-gradient-to-r from-blue-400 to-blue-600" style="width:${pct}%">
+                        <span class="text-[10px] text-white font-medium">${f.avg_engagement}</span>
+                    </div>
+                </div>
+                <span class="text-[10px] text-gray-400 w-14 text-right">${f.count} posts</span>
+            </div>`;
+        }).join('');
+    }
+}
+
+// ── Takeaways (paginated) ──
+function renderTakeaways() {
+    const takes = detailData.takeaways;
+    if (!takes.length) return;
+
+    document.getElementById('takeaways-count-label').textContent = `(${takes.length})`;
+    renderTakeawaysPage();
+}
+
+function renderTakeawaysPage() {
+    const takes = detailData.takeaways;
+    const totalPages = Math.ceil(takes.length / TAKEAWAYS_PER_PAGE);
+    const start = (takeawaysPage - 1) * TAKEAWAYS_PER_PAGE;
+    const end = start + TAKEAWAYS_PER_PAGE;
+    const pageTakes = takes.slice(start, end);
+
+    document.getElementById('takeaways-list').innerHTML = pageTakes.map(t => `
+        <div class="flex items-start gap-2 p-2.5 bg-blue-50 rounded-lg">
+            <svg class="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+            <div class="flex-1">
+                <p class="text-[12px] text-blue-800">${esc(t.takeaway)}</p>
+                <div class="flex items-center gap-2 mt-1">
+                    ${t.topic ? `<span class="text-[10px] text-blue-500">${esc(t.topic)}</span>` : ''}
+                    <span class="text-[10px] text-blue-400">${t.likes} likes</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+
+    renderSectionPagination('takeaways-pagination', 'takeaways-page-info', 'takeaways-page-buttons', takeawaysPage, totalPages, takes.length, TAKEAWAYS_PER_PAGE, goToTakeawaysPage);
+}
+
+function goToTakeawaysPage(page) {
+    const takes = detailData.takeaways;
+    const totalPages = Math.ceil(takes.length / TAKEAWAYS_PER_PAGE);
+    if (page < 1 || page > totalPages) return;
+    takeawaysPage = page;
+    renderTakeawaysPage();
+    if (takeawaysPage > 1) {
+        document.getElementById('takeaways-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+// ── Reusable Section Pagination ──
+function renderSectionPagination(containerId, infoId, buttonsId, currentPg, totalPages, totalItems, perPage, goFn) {
+    const container = document.getElementById(containerId);
+    const info = document.getElementById(infoId);
+    const btns = document.getElementById(buttonsId);
+
+    if (totalPages <= 1) {
+        container.classList.add('hidden');
+        return;
+    }
+
+    container.classList.remove('hidden');
+    const start = (currentPg - 1) * perPage + 1;
+    const end = Math.min(currentPg * perPage, totalItems);
+    info.textContent = `Showing ${start}-${end} of ${totalItems}`;
+
+    // Store the go function globally so onclick can call it
+    const fnName = `_pageFn_${containerId}`;
+    window[fnName] = goFn;
+
+    let buttons = '';
+    buttons += `<button onclick="${fnName}(${currentPg - 1})" ${currentPg === 1 ? 'disabled' : ''} class="w-8 h-8 rounded-lg flex items-center justify-center text-xs ${currentPg === 1 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100'}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+    </button>`;
+
+    for (let i = 1; i <= totalPages; i++) {
+        if (i === 1 || i === totalPages || (i >= currentPg - 1 && i <= currentPg + 1)) {
+            buttons += `<button onclick="${fnName}(${i})" class="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-medium ${i === currentPg ? 'bg-blue-600 text-white' : 'text-gray-600 hover:bg-gray-100'}">${i}</button>`;
+        } else if (i === currentPg - 2 || i === currentPg + 2) {
+            buttons += `<span class="w-6 text-center text-gray-400 text-xs">...</span>`;
+        }
+    }
+
+    buttons += `<button onclick="${fnName}(${currentPg + 1})" ${currentPg === totalPages ? 'disabled' : ''} class="w-8 h-8 rounded-lg flex items-center justify-center text-xs ${currentPg === totalPages ? 'text-gray-300 cursor-not-allowed' : 'text-gray-500 hover:bg-gray-100'}">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+    </button>`;
+
+    btns.innerHTML = buttons;
+}
+
+// ── Filters ──
+function populateFilters() {
+    const hookSet = new Set();
+    const fmtSet = new Set();
+    allPosts.forEach(p => {
+        if (p.hook_style) hookSet.add(p.hook_style);
+        if (p.content_format) fmtSet.add(p.content_format);
+    });
+
+    const hookSelect = document.getElementById('filter-hook');
+    hookSet.forEach(h => {
+        const opt = document.createElement('option');
+        opt.value = h;
+        opt.textContent = fmtLabel(h);
+        hookSelect.appendChild(opt);
+    });
+
+    const fmtSelect = document.getElementById('filter-format');
+    fmtSet.forEach(f => {
+        const opt = document.createElement('option');
+        opt.value = f;
+        opt.textContent = fmtLabel(f);
+        fmtSelect.appendChild(opt);
+    });
+}
+
+// ── Sort & Filter All Posts ──
+function sortAndRender() {
+    const sortBy = document.getElementById('sort-posts').value;
+    const hookFilter = document.getElementById('filter-hook').value;
+    const fmtFilter = document.getElementById('filter-format').value;
+
+    filteredPosts = [...allPosts];
+    if (hookFilter) filteredPosts = filteredPosts.filter(p => p.hook_style === hookFilter);
+    if (fmtFilter) filteredPosts = filteredPosts.filter(p => p.content_format === fmtFilter);
+
+    filteredPosts.sort((a, b) => {
+        switch(sortBy) {
+            case 'engagement': return (b.total_engagement) - (a.total_engagement);
+            case 'likes': return b.likes - a.likes;
+            case 'comments': return b.comments - a.comments;
+            case 'date_desc': return new Date(b.post_date || 0) - new Date(a.post_date || 0);
+            case 'date_asc': return new Date(a.post_date || 0) - new Date(b.post_date || 0);
+            default: return 0;
+        }
+    });
+
+    currentPage = 1;
+    document.getElementById('posts-count-label').textContent = `(${filteredPosts.length} of ${allPosts.length})`;
+    renderPage();
+}
+
+function renderPage() {
+    const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+    const start = (currentPage - 1) * POSTS_PER_PAGE;
+    const end = start + POSTS_PER_PAGE;
+    const pagePosts = filteredPosts.slice(start, end);
+
+    renderAllPosts(pagePosts);
+    renderPagination(totalPages);
+
+    // Scroll to top of the posts section
+    if (currentPage > 1) {
+        document.getElementById('all-posts-list').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+function goToPage(page) {
+    const totalPages = Math.ceil(filteredPosts.length / POSTS_PER_PAGE);
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    renderPage();
+}
+
+function renderPagination(totalPages) {
+    renderSectionPagination('pagination', 'page-info', 'page-buttons', currentPage, totalPages, filteredPosts.length, POSTS_PER_PAGE, goToPage);
+}
+
+function renderAllPosts(posts) {
+    const list = document.getElementById('all-posts-list');
+
+    if (!posts.length) {
+        list.innerHTML = '<p class="text-xs text-gray-300 text-center py-8">No posts match your filters</p>';
+        return;
+    }
+
+    list.innerHTML = posts.map((p, i) => {
+        const date = p.post_date ? new Date(p.post_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+        const expanded = `post-expand-${p.id}`;
+        return `
+        <div class="post-full-card glass-card p-6 fade-in" style="animation-delay: ${Math.min(i, 10) * 30}ms">
+            <div class="flex items-start justify-between mb-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    ${p.hook_style ? `<span class="badge bg-violet-50 text-violet-700 text-[10px]">${fmtLabel(p.hook_style)}</span>` : ''}
+                    ${p.content_format ? `<span class="badge bg-blue-50 text-blue-700 text-[10px]">${fmtLabel(p.content_format)}</span>` : ''}
+                    ${p.topic ? `<span class="badge bg-gray-100 text-gray-600 text-[10px]">${esc(p.topic)}</span>` : ''}
+                    ${p.has_image ? '<span class="badge bg-pink-50 text-pink-600 text-[9px]">Image</span>' : ''}
+                    ${p.has_video ? '<span class="badge bg-red-50 text-red-600 text-[9px]">Video</span>' : ''}
+                    ${p.is_saved ? '<span class="badge bg-amber-50 text-amber-600 text-[9px]">Saved</span>' : ''}
+                    ${p.ai_analyzed ? '<span class="badge bg-cyan-50 text-cyan-600 text-[9px]">AI Analyzed</span>' : ''}
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                    ${date ? `<span class="text-[10px] text-gray-400">${date}</span>` : ''}
+                    ${p.post_url ? `<a href="${p.post_url}" target="_blank" class="text-[10px] text-blue-500 hover:text-blue-700">View on LI</a>` : ''}
+                </div>
+            </div>
+
+            <div id="${expanded}-short" class="cursor-pointer" onclick="toggleExpand('${expanded}')">
+                <p class="text-sm text-gray-700 leading-relaxed line-clamp-3 whitespace-pre-line">${esc(p.content)}</p>
+                <span class="text-[10px] text-blue-500 mt-1 inline-block">Show more</span>
+            </div>
+            <div id="${expanded}-full" class="hidden">
+                <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">${esc(p.content)}</p>
+                <span class="text-[10px] text-blue-500 mt-1 inline-block cursor-pointer" onclick="toggleExpand('${expanded}')">Show less</span>
+            </div>
+
+            <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
+                <div class="flex items-center gap-4 text-xs">
+                    <span class="flex items-center gap-1 text-blue-600 font-medium">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5"/></svg>
+                        ${p.likes}
+                    </span>
+                    <span class="flex items-center gap-1 text-emerald-600 font-medium">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                        ${p.comments}
+                    </span>
+                    <span class="flex items-center gap-1 text-violet-600 font-medium">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z"/></svg>
+                        ${p.shares}
+                    </span>
+                    <span class="text-amber-600 font-bold text-[11px]">${p.total_engagement} total</span>
+                </div>
+                <div class="flex items-center gap-1">
+                    ${!p.ai_analyzed ? `<button onclick="analyzePostFromDetail(${p.id}, this)" class="btn btn-sm text-[10px]" style="background:#06b6d4;color:white;padding:3px 8px">AI Analyze</button>` : ''}
+                    <button onclick="recreatePostFromDetail(${p.id}, this)" class="btn btn-sm text-[10px]" style="background:#059669;color:white;padding:3px 8px">Recreate</button>
+                    <button onclick="toggleSaveFromDetail(${p.id}, this)" class="w-7 h-7 rounded-lg hover:bg-amber-50 flex items-center justify-center" title="${p.is_saved ? 'Unsave' : 'Save'}">
+                        <svg class="w-4 h-4 ${p.is_saved ? 'text-amber-500 fill-current' : 'text-gray-300'}" fill="${p.is_saved ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                    </button>
+                </div>
+            </div>
+
+            ${p.key_takeaway || p.why_it_works || p.how_to_recreate ? `
+            <div class="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                ${p.key_takeaway ? `<p class="text-[11px] text-gray-500"><span class="font-semibold text-gray-600">Takeaway:</span> ${esc(p.key_takeaway)}</p>` : ''}
+                ${p.why_it_works ? `<p class="text-[11px] text-gray-500"><span class="font-semibold text-gray-600">Why it works:</span> ${esc(p.why_it_works)}</p>` : ''}
+                ${p.how_to_recreate ? `<div class="bg-blue-50 rounded-lg p-2.5 mt-2"><p class="text-[11px] text-blue-800"><span class="font-semibold">How to recreate:</span> ${esc(p.how_to_recreate)}</p></div>` : ''}
+            </div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function toggleExpand(id) {
+    const short = document.getElementById(id + '-short');
+    const full = document.getElementById(id + '-full');
+    short.classList.toggle('hidden');
+    full.classList.toggle('hidden');
+}
+
+// ── Actions ──
+async function scrapeThis() {
+    const btn = document.getElementById('btn-scrape');
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Scraping...`;
+    try {
+        const res = await fetch(`/api/competitors/${COMPETITOR_ID}/scrape`, { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+            showToast(`${data.competitor}: ${data.new_posts} new posts, ${data.analyzed} analyzed`, 'success');
+            loadDetail();
+        } else {
+            showToast('Scrape failed: ' + (data.error || 'Unknown'), 'error');
+        }
+    } catch(e) {
+        showToast('Scrape failed', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg> Scrape Now`;
+    }
+}
+
+async function analyzeAllPosts() {
+    const btn = document.getElementById('btn-analyze-all');
+    const unanalyzed = allPosts.filter(p => !p.ai_analyzed);
+    if (!unanalyzed.length) {
+        showToast('All posts are already analyzed', 'info');
+        return;
+    }
+    btn.disabled = true;
+    let done = 0;
+    const total = unanalyzed.length;
+    btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Analyzing 0/${total}...`;
+    for (const p of unanalyzed) {
+        try {
+            const res = await fetch(`/api/competitors/posts/${p.id}/analyze`, { method: 'POST' });
+            if (res.ok) done++;
+        } catch(e) { /* continue */ }
+        btn.innerHTML = `<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Analyzing ${done}/${total}...`;
+    }
+    showToast(`Analyzed ${done} of ${total} posts! Refreshing...`, 'success');
+    loadDetail();
+}
+
+async function analyzePostFromDetail(postId, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Analyzing...'; }
+    try {
+        const res = await fetch(`/api/competitors/posts/${postId}/analyze`, { method: 'POST' });
+        if (res.ok) {
+            showToast('AI analysis complete!', 'success');
+            loadDetail();
+        } else {
+            showToast('Analysis failed', 'error');
+            if (btn) { btn.disabled = false; btn.textContent = 'AI Analyze'; }
+        }
+    } catch(e) {
+        showToast('Analysis failed', 'error');
+        if (btn) { btn.disabled = false; btn.textContent = 'AI Analyze'; }
+    }
+}
+
+async function recreatePostFromDetail(postId, btn) {
+    if (!btn) btn = event.target.closest('button');
+    const origText = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = `<svg class="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Generating...`;
+    try {
+        const res = await fetch(`/api/competitors/posts/${postId}/recreate`, { method: 'POST' });
+        if (res.ok) {
+            const data = await res.json();
+            showToast(`AI post generated! Check Queue (ID: ${data.new_post_id}, Score: ${data.virality_score || 'N/A'})`, 'success');
+        } else {
+            const err = await res.json();
+            showToast('Failed: ' + (err.error || 'Unknown'), 'error');
+        }
+    } catch(e) {
+        showToast('Failed to recreate post', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = origText;
+    }
+}
+
+async function toggleSaveFromDetail(postId, btn) {
+    try {
+        const res = await fetch(`/api/competitors/posts/${postId}/save`, { method: 'POST' });
+        if (!res.ok) throw new Error('Failed');
+        const data = await res.json();
+        const svg = btn.querySelector('svg');
+        if (data.is_saved) {
+            svg.classList.remove('text-gray-300');
+            svg.classList.add('text-amber-500', 'fill-current');
+            svg.setAttribute('fill', 'currentColor');
+            showToast('Saved for inspiration', 'success');
+        } else {
+            svg.classList.add('text-gray-300');
+            svg.classList.remove('text-amber-500', 'fill-current');
+            svg.setAttribute('fill', 'none');
+            showToast('Removed from saved', 'info');
+        }
+    } catch(e) {
+        showToast('Failed to save post', 'error');
+    }
+}
+
+// ── Utilities ──
+function esc(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+function fmtLabel(str) {
+    if (!str) return '';
+    return str.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+}
+
+function fmtNum(n) {
+    if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+    if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+    return n.toString();
+}
+
+function timeAgo(dateStr) {
+    const now = new Date();
+    const date = new Date(dateStr);
+    const diff = Math.floor((now - date) / 1000);
+    if (diff < 60) return 'just now';
+    if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff/86400) + 'd ago';
+    return date.toLocaleDateString();
+}
+</script>
+{% endblock %}
