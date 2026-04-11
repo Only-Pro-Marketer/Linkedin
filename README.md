@@ -4,6 +4,40 @@ An AI-powered LinkedIn content automation system that researches trending topics
 
 Built with FastAPI, Claude API, and the LinkedIn REST API.
 
+## Screenshots
+
+### Post Queue — Approve, reject, or edit AI-generated posts before they go live
+![Queue Dashboard](docs/screenshots/dashboard-queue.png)
+
+### Idea Lab — Turn any idea into a polished LinkedIn post with tone, format, and structure controls
+![Idea Lab](docs/screenshots/idea-generator.png)
+
+### Research Hub — Trending topics from Google Trends, Reddit, RSS, and competitor analysis
+![Research Hub](docs/screenshots/research.png)
+
+### Schedule — Visual calendar to plan and schedule your posting cadence
+![Schedule](docs/screenshots/schedule.png)
+
+### Analytics — Track engagement, find your best posting times, and see template performance
+![Analytics](docs/screenshots/analytics.png)
+
+### Competitors — Monitor competitor posting strategies and recreate what works
+![Competitors](docs/screenshots/competitors.png)
+
+### Autoresearch — Karpathy-style autonomous experimentation to find what hooks and tones work best
+![Experiments](docs/screenshots/experiments.png)
+
+### Learnings — AI-driven insights from your post performance that feed back into generation
+![Learnings](docs/screenshots/learnings.png)
+
+### Post History — Full archive of published, approved, and rejected posts
+![History](docs/screenshots/history.png)
+
+### Settings — LinkedIn OAuth, profile scraping, scheduler controls
+![Settings](docs/screenshots/settings.png)
+
+---
+
 ## What It Does
 
 ```
@@ -22,8 +56,8 @@ Research (every 6h) → Generate (every 4h) → Queue → You Approve → Auto-P
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/YOUR_ORG/linkedin-content-engine.git
-cd linkedin-content-engine
+git clone https://github.com/Only-Pro-Marketer/Linkedin.git
+cd Linkedin
 
 python -m venv .venv
 source .venv/bin/activate
