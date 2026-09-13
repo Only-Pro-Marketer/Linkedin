@@ -114,6 +114,7 @@ class Settings(BaseSettings):
 
     # Dashboard
     HOST: str = "127.0.0.1"
+    ALLOWED_HOSTS: str = ""  # extra host names the dashboard answers to (comma-separated), e.g. a LAN name
     PORT: int = 8000
     RELOAD: bool = False
     DASHBOARD_PASSWORD: str = ""  # required when HOST is not a loopback address

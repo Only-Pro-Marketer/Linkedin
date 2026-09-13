@@ -275,6 +275,24 @@ def init_database():
     run_migrations(engine, db_path)
 
     _seed_content_calendar()
+    _restrict_permissions(db_path)
+
+
+def _restrict_permissions(db_path: str | None) -> None:
+    """The database (and its backups) hold the LinkedIn login: owner-only access."""
+    import glob
+    import logging
+    import os
+
+    if not db_path or db_path == ":memory:":
+        return
+    backups = glob.glob(os.path.join(os.path.dirname(db_path) or ".", "backups", "*"))
+    for path in [db_path, f"{db_path}-wal", f"{db_path}-shm", *backups]:
+        try:
+            if os.path.isfile(path):
+                os.chmod(path, 0o600)
+        except OSError as e:
+            logging.getLogger(__name__).warning("Couldn't restrict permissions on %s: %s", path, e)
 
 
 def get_db() -> Session:

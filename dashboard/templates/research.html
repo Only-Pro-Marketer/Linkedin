@@ -499,7 +499,7 @@ async function loadResearchStats() {
                 .sort((a, b) => b[1] - a[1])
                 .map(([source, count]) => {
                     const cls = getSourceClass(source);
-                    return `<span class="badge ${cls} text-xs px-3 py-1">${formatSource(source)}: ${count}</span>`;
+                    return `<span class="badge ${cls} text-xs px-3 py-1">${esc(formatSource(source))}: ${count}</span>`;
                 }).join('');
         } else {
             document.getElementById('sourceChips').innerHTML = '<span class="text-sm text-gray-400">No research data yet</span>';
@@ -511,7 +511,7 @@ async function loadResearchStats() {
                 .sort((a, b) => b[1] - a[1])
                 .map(([region, count]) => {
                     const cls = getRegionClass(region);
-                    return `<span class="badge ${cls} text-xs px-3 py-1">${formatRegion(region)}: ${count}</span>`;
+                    return `<span class="badge ${cls} text-xs px-3 py-1">${esc(formatRegion(region))}: ${count}</span>`;
                 }).join('');
         } else {
             document.getElementById('regionChips').innerHTML = '<span class="text-sm text-gray-400">No data</span>';
@@ -523,7 +523,7 @@ async function loadResearchStats() {
                 .sort((a, b) => b[1] - a[1])
                 .map(([cat, count]) => {
                     const cls = getCategoryClass(cat);
-                    return `<span class="badge ${cls} text-xs px-3 py-1">${formatCategory(cat)}: ${count}</span>`;
+                    return `<span class="badge ${cls} text-xs px-3 py-1">${esc(formatCategory(cat))}: ${count}</span>`;
                 }).join('');
         } else {
             document.getElementById('categoryChips').innerHTML = '<span class="text-sm text-gray-400">No data</span>';
@@ -569,7 +569,7 @@ async function loadResearchSources() {
         const sel = document.getElementById('filterSource');
         sel.innerHTML = '<option value="">All Sources</option>';
         for (const s of sources) {
-            sel.innerHTML += `<option value="${s.source}">${formatSource(s.source)} (${s.count})</option>`;
+            sel.innerHTML += `<option value="${esc(s.source)}">${esc(formatSource(s.source))} (${s.count})</option>`;
         }
     } catch (e) {
         console.error('Failed to load sources:', e);
@@ -761,7 +761,7 @@ function renderClusterItem(item) {
     <div class="p-3 hover:bg-gray-50 cursor-pointer flex items-center gap-3" onclick="showDetail(${item.id})">
         <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 mb-0.5 flex-wrap">
-                <span class="badge ${sourceClass} text-[11px]">${formatSource(item.source)}</span>
+                <span class="badge ${sourceClass} text-[11px]">${esc(formatSource(item.source))}</span>
                 <span class="badge ${relevanceClass} text-[11px]">${relevancePct}%</span>
                 ${velocityBadge}
                 ${usedBadge}
@@ -828,9 +828,9 @@ function renderItems(items) {
                 </button>
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <span class="badge ${sourceClass} text-[11px]">${formatSource(item.source)}</span>
-                        ${item.region ? `<span class="badge ${getRegionClass(item.region)} text-[11px]">${formatRegion(item.region)}</span>` : ''}
-                        ${item.category ? `<span class="badge ${getCategoryClass(item.category)} text-[11px]">${formatCategory(item.category)}</span>` : ''}
+                        <span class="badge ${sourceClass} text-[11px]">${esc(formatSource(item.source))}</span>
+                        ${item.region ? `<span class="badge ${getRegionClass(item.region)} text-[11px]">${esc(formatRegion(item.region))}</span>` : ''}
+                        ${item.category ? `<span class="badge ${getCategoryClass(item.category)} text-[11px]">${esc(formatCategory(item.category))}</span>` : ''}
                         <span class="badge ${relevanceClass} text-[11px]">${relevancePct}% relevant</span>
                         ${velocityBadge}
                         ${usedBadge}
@@ -1062,7 +1062,7 @@ function showDetail(id) {
     // URL
     if (item.url) {
         document.getElementById('modalUrlRow').classList.remove('hidden');
-        document.getElementById('modalUrl').href = item.url;
+        document.getElementById('modalUrl').href = safeUrl(item.url);
         document.getElementById('modalUrl').textContent = item.url;
     } else {
         document.getElementById('modalUrlRow').classList.add('hidden');
@@ -1401,7 +1401,7 @@ function formatRegion(region) {
 }
 
 function getRegionClass(region) {
-    return `region-${region || 'global'}`;
+    return `region-${String(region || 'global').replace(/[^a-z0-9_-]/gi, '')}`;
 }
 
 function formatCategory(category) {
@@ -1421,14 +1421,10 @@ function formatCategory(category) {
 }
 
 function getCategoryClass(category) {
-    return `category-${category || 'ecommerce_general'}`;
+    return `category-${String(category || 'ecommerce_general').replace(/[^a-z0-9_-]/gi, '')}`;
 }
 
-function escapeHtml(text) {
-    const el = document.createElement('span');
-    el.textContent = text;
-    return el.innerHTML;
-}
+function escapeHtml(text) { return esc(text); }  // base.html esc() also escapes quotes
 
 /* ── Topic Map — 2D interactive force graph with zoom/pan ──── */
 
@@ -1474,7 +1470,7 @@ function populateCatFilter() {
     sel.innerHTML = '<option value="">All Categories</option>';
     cats.forEach(c => {
         const label = c.replace(/_/g, ' ').replace(/\b\w/g, ch => ch.toUpperCase());
-        sel.innerHTML += `<option value="${c}">${label}</option>`;
+        sel.innerHTML += `<option value="${esc(c)}">${esc(label)}</option>`;
     });
 }
 
@@ -1516,7 +1512,7 @@ function buildLegend() {
         const label = cat.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
         const el = document.createElement('span');
         el.style.cssText = 'display:inline-flex;align-items:center;gap:5px;cursor:pointer;padding:2px 6px;border-radius:6px;transition:background 0.15s;';
-        el.innerHTML = `<span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0;"></span>${label}`;
+        el.innerHTML = `<span style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0;"></span>${esc(label)}`;
         el.onclick = () => {
             document.getElementById('map-cat-filter').value = cat;
             filterMapCategory(cat);
@@ -1876,7 +1872,7 @@ function selectNode(n) {
             const nd = nMap[id];
             if (!nd) return '';
             const col = CAT_COLORS[nd.category] || '#9CA3AF';
-            return `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;background:${col}18;color:${col};border:1px solid ${col}30;cursor:pointer;" onclick="selectNodeById('${esc(id)}')">${esc(nd.label.slice(0,25))}</span>`;
+            return `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;background:${col}18;color:${col};border:1px solid ${col}30;cursor:pointer;" data-node-id="${esc(id)}" onclick="selectNodeById(this.dataset.nodeId)">${esc(nd.label.slice(0,25))}</span>`;
         }).join(' ');
         document.getElementById('detail-body').innerHTML += `<div style="margin-top:8px;"><span style="font-size:11px;color:var(--text-muted);">Connected topics</span><div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${tags}</div></div>`;
     }

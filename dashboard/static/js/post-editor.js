@@ -46,7 +46,7 @@
             if (!report) { this.el.innerHTML = ''; return; }
             const [title, sub, color] = STATUS[report.status] || STATUS.review;
             const issue = (i) => `
-                <div class="q-issue ${i.severity}" data-match="${esc(i.match || '')}">
+                <div class="q-issue ${i.severity === 'blocker' ? 'blocker' : 'warning'}" data-match="${esc(i.match || '')}">
                     <span class="q-sev"></span>
                     <div>
                         <div class="q-issue-msg">${esc(i.message)}</div>
@@ -59,7 +59,7 @@
             const tips = report.tips || [];
             this.el.innerHTML = `
                 <div class="q-head">
-                    <div class="q-ring" style="--p:${report.score};--c:${color}"><span>${report.score}</span></div>
+                    <div class="q-ring" style="--p:${Number(report.score) || 0};--c:${color}"><span>${Number(report.score) || 0}</span></div>
                     <div><div class="q-status">${title}</div><div class="q-status-sub">${sub}</div></div>
                 </div>
                 ${blockers.length ? `<div class="q-section-label">Must fix (${blockers.length})</div>${blockers.map(issue).join('')}` : ''}

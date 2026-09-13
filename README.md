@@ -2,7 +2,61 @@
 
 A local app that researches, writes, checks and publishes LinkedIn posts, and helps you comment and reply, with you approving every word.
 
-Built with FastAPI, the Claude API and the LinkedIn REST API. The writing playbooks in `knowledge/` come from [linkedin-skills](https://github.com/sergebulaev/linkedin-skills) by Serge Bulaev (MIT).
+Built by **[Arun Kirupa](#about-the-author)**, founder of [Pro Marketer](https://www.promarketer.ca). It runs on FastAPI, the Claude API and the LinkedIn REST API. The writing playbooks in `knowledge/` come from [linkedin-skills](https://github.com/sergebulaev/linkedin-skills) by Serge Bulaev (MIT).
+
+📖 **New here?** Read the full **[User Guide](docs/GUIDE.md)**: setup, daily routine, every page explained, and troubleshooting.
+
+---
+
+## Screenshots
+
+| | |
+|---|---|
+| **Home**: what needs you today, setup checklist, what's coming up, Engage tasks, AI spend<br>![Home](docs/screenshots/home.png) | **Studio**: pick a goal and a proven hook formula, add your facts, get a checked draft with a live LinkedIn preview<br>![Studio](docs/screenshots/studio.png) |
+| **Queue**: every draft gets a quality score before you approve it<br>![Queue](docs/screenshots/queue.png) | **Queue editor**: the quality check lists AI tells and reach problems, with Auto-fix and Fix with AI<br>![Queue editor](docs/screenshots/queue-editor.png) |
+| **Plan**: a week of posts across your content pillars; draft any item into the Queue<br>![Plan](docs/screenshots/plan.png) | **Engage**: comments and replies you approved post one at a time, with Copy + Open as a fallback<br>![Engage](docs/screenshots/engage.png) |
+| **Brand Voice**: the guided editor for how you sound, plus *Learn my voice* from your own posts<br>![Brand Voice](docs/screenshots/brand-voice.png) | **Schedule**: posting times and scheduled posts in your timezone<br>![Schedule](docs/screenshots/schedule.png) |
+| **History**: published posts; type in LinkedIn's numbers so the app learns what works<br>![History](docs/screenshots/history.png) | **Settings**: LinkedIn connection test, limits, posting times, AI usage by feature<br>![Settings](docs/screenshots/settings.png) |
+| **Profile Optimizer**: a 9-part scorecard with headline, About and experience rewrites<br>![Profile Optimizer](docs/screenshots/profile-optimizer.png) | |
+
+*Screenshots use demo data: posts already published on LinkedIn and a sample queue.*
+
+---
+
+## How it works
+
+```mermaid
+flowchart LR
+    R[Research<br/>Google Trends · Reddit · RSS<br/>competitors] --> D
+    B[Brand Voice<br/>soul/soul.md] --> D
+    K[Playbooks<br/>hook formulas · voice rules] --> D
+    D[Drafting<br/>Studio · Plan · Idea Lab<br/>scheduled batches] --> Q{Quality gate}
+    Q -->|auto-fix, 1 AI repair,<br/>fact-check, reach score| U[Queue<br/>you review]
+    U -->|Approve / Schedule| P[Publish to LinkedIn<br/>daily cap + spacing]
+    P --> F[First comment<br/>links go here]
+    P --> S[Stats<br/>API or typed in]
+    S --> L[Learnings<br/>feed future drafts]
+    L --> D
+    E[Engage<br/>comment + reply drafts] --> A{You approve}
+    A -->|paced API posting| LI[LinkedIn]
+    A -->|fallback| C[Copy + Open post]
+```
+
+1. **Your voice comes first.** `soul/soul.md`, edited on the **Brand Voice** page, holds who you are, your business, your audience, your pillars, your voice fingerprint and words you never use. Every Claude call gets this as its system prompt, along with the relevant playbooks from `knowledge/`.
+2. **Drafts come from four places:**
+   - **Studio**: goal → formula → your facts;
+   - **Plan**: a guard-railed week of posts;
+   - **Idea Lab**: variations of a rough idea;
+   - **scheduled batches** from research.
+3. **Every draft passes one quality gate:**
+   - formatting for LinkedIn (the 25-line limit, clean characters);
+   - safe automatic fixes;
+   - an AI-tell audit (question openers, reveal bridges, clichés, too many em dashes, links in the body, placeholders);
+   - at most one "Fix with AI" pass;
+   - a combined fact-check and reach score.
+4. **You review in the Queue.** Nothing is published without your approval. Approved posts go out at your posting times, never more than `POSTS_PER_DAY`. If a post has a link, it goes into the **first comment**, which the app posts right after.
+5. **The loop closes.** The app learns from real results, either read from LinkedIn (if your app has `r_member_social`) or typed into **History**. Learnings feed back into future drafts. Autoresearch experiments only start after 10 real posts.
+6. **Engage grows your reach between posts.** It drafts comments on posts in your niche and replies to comments on yours. Approved items post through the LinkedIn API one at a time, 90–180 seconds apart and under a daily cap. If LinkedIn refuses, everything switches to *Copy + Open post*.
 
 ## What's inside
 
@@ -10,24 +64,30 @@ Built with FastAPI, the Claude API and the LinkedIn REST API. The writing playbo
 |---|---|---|
 | | **Home** | Setup checklist, drafts to review, what's coming up, Engage tasks, AI spend |
 | Create | **Studio** | *Write*: goal → proven hook formula (F1–F20) → your facts → draft. *Repurpose*: turn an article, newsletter or transcript into up to 3 posts. *Hook Lab*: see why a hook works and save it as a template |
-| | **Plan** | A 3–5 post week across your pillars. No pillar above 60%, no formula twice in 7 days. "Draft this" puts a post in your Queue |
+| | **Plan** | A 3–5 post week across your pillars. No pillar above 60% and no formula twice in 7 days, both enforced in code |
 | | **Idea Lab** | Turn a rough idea into several variations |
-| Review | **Queue** | Every draft has a quality score. The editor shows AI tells, a LinkedIn preview with the "…see more" fold, and Auto-fix / Fix with AI buttons |
-| | **Schedule / History** | Scheduled and published posts, failed posts with retry, and numbers you enter by hand from LinkedIn |
-| Engage | **Engage** | Comment on other people's posts (T1–T7 templates), reply to comments on yours (R1–R5), daily targets, follow-ups. Approved comments post through the LinkedIn API one at a time |
-| Insights | **Research, Analytics, Learnings, Competitors** | Trending topics and what works for you. Experiments appear once autoresearch is on |
-| Setup | **Brand Voice** | A guided editor for `soul/soul.md`. *Learn my voice* suggests voice sections from your own posts |
-| | **Profile Optimizer** | A 9-part profile scorecard with headline, About and experience rewrites |
-| | **Settings** | LinkedIn connection test, limits and toggles, posting times, AI usage by feature |
+| Review | **Queue** | Quality score on every draft. The editor shows the issues, a LinkedIn preview with the "…see more" fold, and Auto-fix / Fix with AI |
+| | **Schedule / History** | Scheduled and published posts, failed posts with retry, and stats you type in from LinkedIn |
+| Engage | **Engage** | Comment on others' posts (T1–T7), reply to comments on yours (R1–R5), daily targets, follow-ups, activity |
+| Insights | **Research, Analytics, Learnings, Competitors** | Trending topics, what works for you, competitor patterns. Experiments appear once autoresearch is on |
+| Setup | **Brand Voice** | Guided editor for `soul/soul.md`, plus *Learn my voice* |
+| | **Profile Optimizer** | 9-part profile scorecard with rewrites |
+| | **Settings** | Connection test, limits and toggles, posting times, AI usage by feature |
 
-## How it keeps you safe
+**Images:** the **Gen Image** button creates a post image with [kie.ai](https://kie.ai) (Nano Banana), or with Google Gemini when only that key is set. Images avoid invented numbers and logos.
 
-- **Nothing publishes without your approval.** Post now, the scheduler and Engage only publish items you approved.
-- **Limits:** `POSTS_PER_DAY` (default 1) on every path, a minimum gap between automatic posts, and `ENGAGE_DAILY_CAP` for comments.
-- **One quality gate.** Every new draft goes through the same pipeline: format → safe auto-fixes → AI-tell audit → at most one AI repair → fact-check and reach score.
-- **No invented facts.** Drafts only use facts from your Brand Voice and the notes you give. Anything missing becomes a `[placeholder]` that blocks approval until you fill it.
-- **Comments are careful.** Approved comments go out 1–3 minutes apart, reacting before commenting. If LinkedIn refuses (403), everything switches to Copy + Open post. If LinkedIn doesn't answer, the item is marked "check on LinkedIn" and never retried automatically, so nothing posts twice.
-- **Local by default.** The app listens on 127.0.0.1. It refuses to listen on a network address unless `DASHBOARD_PASSWORD` is set. Cross-site requests are blocked, URL fetches are limited to public hosts, and scraped text is marked as untrusted in every prompt.
+## Safety and security
+
+- **Approval gate.** Posts, comments and replies are only published after you approve them. Post now, the scheduler and Engage all enforce it.
+- **Limits.** `POSTS_PER_DAY` (default 1) applies on every publish path, plus a minimum gap between automatic posts. `ENGAGE_DAILY_CAP` limits comments, which are spaced out. If LinkedIn doesn't confirm an item, it's marked "check on LinkedIn" and never retried, so nothing posts twice.
+- **No invented facts.** Drafts only use your Brand Voice and the notes you give. Missing facts become `[placeholders]`, which block approval until you fill them.
+- **Local and locked down.**
+  - The app listens on `127.0.0.1` and refuses a network address unless `DASHBOARD_PASSWORD` is set.
+  - It only answers requests addressed to `localhost` / `127.0.0.1`, which blocks DNS rebinding.
+  - Cross-site requests are blocked, and pages can't be framed by other sites.
+  - Server-side fetches only go to public hosts.
+- **Untrusted text stays inert.** Scraped and pasted text is marked as untrusted in every prompt and escaped on every page. A test fails the build if a page brings back an unsafe pattern.
+- **Secrets stay local.** Keys live in `.env`, which is gitignored. The database, which holds your LinkedIn login, is owner-only. A pre-commit check blocks commits containing keys.
 
 ## Quick start
 
@@ -37,36 +97,34 @@ cd Linkedin
 python3.12 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env        # then add your keys
+cp .env.example .env        # add your keys
 python app.py
 ```
 
 Open **http://localhost:8000** and follow the checklist on Home:
 
 1. Add `ANTHROPIC_API_KEY` to `.env`.
-2. Fill in **Brand Voice**. This matters most: drafts stay generic until it's done. Paste 3–6 of your posts into *Learn my voice* to get a head start.
+2. Fill in **Brand Voice**. Paste 3–6 of your posts into *Learn my voice* for a head start.
 3. **Connect LinkedIn** (Settings → Connect).
 4. Check your **posting times** in Settings.
-5. Write something in **Studio**, review it in the **Queue** and approve it.
+5. Write in **Studio**, review in the **Queue**, and approve.
 
 | Key | Required | Where to get it |
 |-----|----------|-----------------|
 | `ANTHROPIC_API_KEY` | Yes | [console.anthropic.com](https://console.anthropic.com/) |
-| `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | To publish | [linkedin.com/developers](https://www.linkedin.com/developers/): enable *Sign In with LinkedIn using OpenID Connect* and *Share on LinkedIn* |
+| `LINKEDIN_CLIENT_ID` / `LINKEDIN_CLIENT_SECRET` | To publish | [linkedin.com/developers](https://www.linkedin.com/developers/): enable *Sign In with LinkedIn using OpenID Connect* and *Share on LinkedIn*; redirect URL `http://localhost:8000/auth/callback` |
+| `KIE_API_KEY` | No | [kie.ai](https://kie.ai/api-key) for post images. Used instead of Gemini when set |
 | `APIFY_TOKEN` | No | Optional scraping (competitors, your own posts, fetching comments). Everything also works by pasting |
-| `KIE_API_KEY` | No | [kie.ai](https://kie.ai/api-key) for post images (Nano Banana). Used instead of Gemini when set |
 | `REDDIT_CLIENT_ID` / `GEMINI_API_KEY` | No | Extra research source / Gemini images |
 
-## LinkedIn permissions
+### LinkedIn permissions
 
 - `w_member_social` (default): publish posts, comments and reactions.
-- `r_member_social` (needs LinkedIn approval): read post stats automatically. Without it, type the numbers into History and Learnings uses them.
-
-Settings shows what your current login allows and has a **Test connection** button.
+- `r_member_social` (needs LinkedIn approval): read post stats automatically. Without it, type the numbers into History.
 
 ## Configuration
 
-Secrets live in `.env`. Limits and toggles can also be changed in **Settings**; those are stored in the database and override `.env`.
+Secrets live in `.env`. Limits and toggles can also be changed in **Settings**; those values override `.env`.
 
 | Setting | Default | What it does |
 |---|---|---|
@@ -74,12 +132,19 @@ Secrets live in `.env`. Limits and toggles can also be changed in **Settings**; 
 | `MIN_HOURS_BETWEEN_POSTS` | 3 | Gap between automatic publishes |
 | `ENGAGE_DAILY_CAP` | 30 | Comments and replies per day |
 | `SCHEDULER_ENABLED` | true | Background jobs on or off |
-| `AUTO_REPAIR` | true | One "Fix with AI" pass on drafts that fail the quality check |
-| `FACT_CHECK_ENABLED` | true | Fact-check new drafts |
+| `AUTO_REPAIR` / `FACT_CHECK_ENABLED` | true / true | AI repair pass and fact-check for new drafts |
 | `AUTORESEARCH_ENABLED` | false | Claude-scored experiments (idle until 10 real posts) |
 | `CLAUDE_MODEL` | claude-opus-5 | Model for every Claude call |
+| `KIE_IMAGE_MODEL` / `KIE_IMAGE_ASPECT` | google/nano-banana / 4:5 | Post images |
 | `POSTING_TIMEZONE` | America/Toronto | All schedule times use this zone |
-| `HOST` / `DASHBOARD_PASSWORD` | 127.0.0.1 / empty | Set a password before exposing the app to a network |
+| `HOST` / `DASHBOARD_PASSWORD` / `ALLOWED_HOSTS` | 127.0.0.1 / empty / empty | Network exposure; set a password before opening the app to a network |
+
+## What it costs to run
+
+- **Claude:** pay per use. **Settings → AI usage** shows calls and estimated cost by feature for the last 30 days.
+- **kie.ai images:** about 4 credits per image with Nano Banana.
+- **Apify (optional):** about $0.002 per scraped post, $0.01 per profile and $0.005 per comment. Daily imports cost cents per competitor.
+- **LinkedIn API:** free.
 
 ## Development
 
@@ -88,9 +153,7 @@ pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-Tests use a temporary database and a fake Claude, so they don't need keys or a network. See `CLAUDE.md` for the architecture and the rules the code relies on.
-
-## Architecture
+Tests use a temporary database, a fake Claude and mocked LinkedIn, kie.ai and Apify, so they need no keys or network. See [`CLAUDE.md`](CLAUDE.md) for the architecture and the rules the code relies on.
 
 ```
 app.py                     FastAPI app: middleware, routers, startup recovery
@@ -99,19 +162,35 @@ llm.py                     The only place that calls Claude (caching, refusals, 
 knowledge/                 Vendored playbooks from linkedin-skills (MIT) + loader
 soul/soul.md               Your brand voice
 content/                   brand, prompt_builder, pipeline (quality gate), humanizer + quality_rules,
-                           ai_fix, review (fact-check + reach score), generator, templates/formulas (F1–F20)
+                           ai_fix, review (fact-check + reach score), generator, image_generator, templates/formulas
 studio/                    writer, repurposer, hook_lab, planner, voice, profile
 engagement/                comment_drafter, reply_handler, publisher (paced API posting), followups
 linkedin/                  api_client (posts, comments, reactions), poster (approval gate + limits), url_parser
 post_queue/                queue state, scheduler jobs, calendar slots
-research/ analytics/ autoresearch/   research sources, learning loop, experiments
-dashboard/                 routers/ (home, studio, plan, engage, brand, profile, settings, quality, stats),
-                           routes.py (older pages), templates/, static/js (app.js, post-editor.js)
+research/ analytics/ autoresearch/   research sources (incl. optional Apify), learning loop, experiments
+dashboard/                 routers/, routes.py, security.py, templates/, static/js (app.js, post-editor.js)
 database/                  models, engine (SQLite WAL), migrations (versioned, backed up)
 tests/                     pytest suite
 ```
 
 Post status flow: `QUEUED → APPROVED → (SCHEDULED) → POSTING → POSTED`, or `REJECTED` / `FAILED` (with retry).
+
+---
+
+## About the author
+
+**Arun Kirupa** is the Founder and Head of Strategy at **[Pro Marketer](https://www.promarketer.ca)**, a Toronto e-commerce growth agency he started in 2018.
+
+- Helps e-commerce owners grow with the proprietary **Growth Trust Model®**: a 90-day plan built around CRO, AOV, retention and paid media.
+- Shopify specialist for **supplement, apparel and skincare** brands. Pro Marketer is a **Klaviyo Partner** and a **Zoho Authorized Partner**.
+- Host of the **Pro Marketer CheckOut Podcast**, where he interviews e-commerce founders.
+- Founder of the **"DTC Owner" community** on Skool.
+- Previously a contract CMO leading a 40+ person marketing team.
+
+He built this engine to run his own LinkedIn the way he runs client growth: a clear process, real numbers, and a human approving every word.
+
+- LinkedIn: [linkedin.com/in/arunkirupa](https://www.linkedin.com/in/arunkirupa/)
+- Website: [promarketer.ca](https://www.promarketer.ca)
 
 ## License
 

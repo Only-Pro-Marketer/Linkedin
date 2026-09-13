@@ -17,6 +17,7 @@ os.environ["ANTHROPIC_API_KEY"] = "test-key"
 os.environ["POSTING_TIMEZONE"] = "America/Toronto"
 os.environ["APIFY_TOKEN"] = ""
 os.environ["KIE_API_KEY"] = ""  # never call real image services from tests
+os.environ["ALLOWED_HOSTS"] = "testserver"  # TestClient's host name
 os.environ["GEMINI_API_KEY"] = ""
 
 import pytest  # noqa: E402

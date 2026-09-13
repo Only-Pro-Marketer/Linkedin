@@ -279,7 +279,7 @@ async function loadHistory() {
             ${runs.map(r => `
             <tr class="border-b border-gray-50 hover:bg-gray-50">
                 <td class="px-4 py-2.5 text-gray-600">${formatDate(r.created_at)}</td>
-                <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs">${r.run_type}</span></td>
+                <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs">${esc(r.run_type)}</span></td>
                 <td class="px-4 py-2.5 text-right text-gray-900">${r.posts_analyzed}</td>
                 <td class="px-4 py-2.5 text-right text-green-600 font-medium">+${r.insights_created}</td>
                 <td class="px-4 py-2.5 text-right text-amber-600">${r.insights_updated || 0}</td>
@@ -322,7 +322,7 @@ async function loadExperimentsSummary() {
                 const sorted = Object.entries(params).sort((a, b) => b[1].win_rate - a[1].win_rate);
                 const bars = sorted.map(([label, d]) => `
                     <div class="flex items-center gap-2 mb-1">
-                        <span class="text-xs text-gray-600 w-24 truncate" title="${label}">${label}</span>
+                        <span class="text-xs text-gray-600 w-24 truncate" title="${esc(label)}">${esc(label)}</span>
                         <div class="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
                             <div class="h-full rounded-full ${d.win_rate > 40 ? 'bg-green-500' : d.win_rate > 20 ? 'bg-blue-500' : 'bg-gray-300'}" style="width: ${Math.max(d.win_rate, 5)}%"></div>
                         </div>
@@ -332,7 +332,7 @@ async function loadExperimentsSummary() {
                 `).join('');
                 grid.innerHTML += `
                     <div class="glass-card p-6">
-                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">${type}</h4>
+                        <h4 class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">${esc(type)}</h4>
                         ${bars}
                     </div>
                 `;
@@ -389,15 +389,15 @@ async function loadRecentExperiments() {
                     const dots = exp.variations.map(v => {
                         const s = v.virality_score || 0;
                         const c = v.is_winner ? 'bg-green-500 text-white' : s >= 65 ? 'bg-blue-100 text-blue-700' : s >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-500';
-                        return `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${c}" title="${v.label}: ${s}">${s}</span>`;
+                        return `<span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold ${c}" title="${esc(v.label)}: ${s}">${s}</span>`;
                     }).join('');
                     return `
                     <tr class="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onclick="window.location='/experiments'">
                         <td class="px-4 py-2.5 text-gray-500">${formatDate(exp.created_at)}</td>
-                        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md text-xs font-medium ${tc}">${exp.type}</span></td>
-                        <td class="px-4 py-2.5 text-gray-700 max-w-[200px] truncate">${exp.topic || '-'}</td>
+                        <td class="px-4 py-2.5"><span class="px-2 py-0.5 rounded-md text-xs font-medium ${tc}">${esc(exp.type)}</span></td>
+                        <td class="px-4 py-2.5 text-gray-700 max-w-[200px] truncate">${esc(exp.topic || '-')}</td>
                         <td class="px-4 py-2.5 text-center"><div class="flex items-center justify-center gap-0.5">${dots}</div></td>
-                        <td class="px-4 py-2.5 text-gray-900 font-medium">${winner ? winner.label : '-'}</td>
+                        <td class="px-4 py-2.5 text-gray-900 font-medium">${winner ? esc(winner.label) : '-'}</td>
                         <td class="px-4 py-2.5 text-right font-bold ${(exp.winner_score || 0) >= 65 ? 'text-green-600' : (exp.winner_score || 0) >= 40 ? 'text-yellow-600' : 'text-gray-500'}">${exp.winner_score || '-'}</td>
                         <td class="px-4 py-2.5 text-right text-gray-400">${exp.score_spread || 0}</td>
                         <td class="px-4 py-2.5 text-center">${exp.queued_post_id ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded-md bg-green-50 text-green-700 text-[10px] font-medium">Queued</span>' : '<span class="text-gray-300">-</span>'}</td>

@@ -721,7 +721,7 @@ document.getElementById('edit-modal')?.addEventListener('click', (e) => { if (e.
 
 /* ── Helpers ──────────────────────────────────────────────── */
 
-function esc(text) { if (!text) return ''; const d = document.createElement('div'); d.textContent = text; return d.innerHTML; }
+// esc() comes from base.html (it also escapes quotes)
 const escapeHtml = esc;
 
 function formatDate(isoStr) {

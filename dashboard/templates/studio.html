@@ -281,7 +281,7 @@ async function analyzeHook(btn) {
             <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
                 <button type="button" class="btn btn-primary btn-sm" onclick="saveHook(this)">Save to hook library</button>
                 <button type="button" class="btn btn-ghost btn-sm" onclick="App.copy($('h-template').value)">Copy template</button>
-                ${r.formula ? `<button type="button" class="btn btn-ghost btn-sm" onclick="useFormula('${esc(r.formula.id)}')">Write with ${esc(r.formula.id)}</button>` : ''}
+                ${r.formula ? `<button type="button" class="btn btn-ghost btn-sm" data-formula="${esc(r.formula.id)}" onclick="useFormula(this.dataset.formula)">Write with ${esc(r.formula.id)}</button>` : ''}
             </div>`;
     } catch (e) { /* toast already shown */ } finally { App.busy(btn, false); }
 }

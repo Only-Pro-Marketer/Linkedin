@@ -325,7 +325,7 @@ async function generatePosts() {
 
         if (data.error) {
             showToast(data.error, 'error');
-            list.innerHTML = `<div class="empty-state"><div class="empty-state-title" style="color: var(--danger);">${data.error}</div></div>`;
+            list.innerHTML = `<div class="empty-state"><div class="empty-state-title" style="color: var(--danger);">${esc(data.error)}</div></div>`;
             return;
         }
 
@@ -394,7 +394,7 @@ function renderResults(posts) {
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
                             Add to Queue
                         </button>
-                        <button onclick="copyPost(this, '${post.post_id}')" class="btn btn-ghost btn-sm">
+                        <button data-post-id="${esc(post.post_id)}" onclick="copyPost(this, this.dataset.postId)" class="btn btn-ghost btn-sm">
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                             Copy
                         </button>
@@ -479,7 +479,7 @@ function renderCategoryFilters() {
     topicLibraryData.forEach(cat => {
         const color = categoryColors[cat.color] || '#6b7280';
         const isActive = activeCategory === cat.category;
-        html += `<button onclick="filterCategory('${cat.category.replace(/'/g, "\\'")}')" class="cat-pill ${isActive ? 'active' : ''}">
+        html += `<button data-cat="${esc(cat.category)}" onclick="filterCategory(this.dataset.cat)" class="cat-pill ${isActive ? 'active' : ''}">
             <span class="cat-dot" style="background:${color}"></span>
             ${cat.category}
         </button>`;
@@ -528,10 +528,6 @@ function capitalize(str) {
     return str.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-function escapeHtml(text) {
-    const el = document.createElement('span');
-    el.textContent = text;
-    return el.innerHTML;
-}
+function escapeHtml(text) { return esc(text); }  // base.html esc() also escapes quotes
 </script>
 {% endblock %}
