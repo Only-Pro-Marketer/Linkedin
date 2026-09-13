@@ -30,7 +30,19 @@ Startup runs `init_database()` (create tables → versioned migrations in `datab
 - `studio/`: writer (formula drafts), repurposer, hook_lab, planner (enforces pillar/formula guardrails), voice (Learn my voice), profile (optimizer). `studio/base.run_tool` records each run in `StudioRun`.
 - `engagement/`: comment_drafter (T1–T7), reply_handler (parse → filter → R1–R5), publisher, followups. Reply threading: `parentComment` is always the TOP-level comment URN.
 - `knowledge/`: vendored markdown from linkedin-skills (MIT); `knowledge/loader.PACKS` maps features to files.
-- Security: `dashboard/security.py` (same-origin check on writes, optional password login), `utils/netguard.py` (public URLs only).
+- Security: `dashboard/security.py` has four pieces:
+  - the host allowlist (`allowed_hosts()` via `TrustedHostMiddleware`, which blocks DNS rebinding; add names with `ALLOWED_HOSTS`);
+  - security headers (no framing, nosniff);
+  - the same-origin check on writes;
+  - the optional password login.
+
+  `utils/netguard.py` limits server-side fetches to public URLs. The database is made owner-only at startup.
+- Front-end escaping:
+  - use the global `esc()` from `base.html` for every value put into HTML, and `safeUrl()` for links;
+  - never define a page-local `esc`;
+  - never build inline JS from data. Use `data-*` attributes, for example `onclick="fn(this.dataset.id)"`.
+
+  `tests/test_security.py::test_templates_escape_safely` enforces this.
 
 ## Adding things
 
