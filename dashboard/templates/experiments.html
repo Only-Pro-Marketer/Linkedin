@@ -163,8 +163,8 @@ async function loadExperiments() {
                                 ${exp.queued_post_id ? '<span class="badge badge-success">Queued</span>' : ''}
                                 ${exp.actual_engagement != null ? `<span class="badge badge-info">Actual: ${Math.round(exp.actual_engagement)}</span>` : ''}
                             </div>
-                            <p class="text-sm truncate" style="color: var(--text-primary);">${exp.topic || ''}</p>
-                            <p class="text-xs mt-0.5 truncate" style="color: var(--text-muted);">${exp.hypothesis || ''}</p>
+                            <p class="text-sm truncate" style="color: var(--text-primary);">${esc(exp.topic || '')}</p>
+                            <p class="text-xs mt-0.5 truncate" style="color: var(--text-muted);">${esc(exp.hypothesis || '')}</p>
                         </div>
                         <div class="flex items-center gap-3 flex-shrink-0">
                             <div class="flex items-center gap-1">${variationDots}</div>
@@ -200,7 +200,7 @@ async function showVariations(expId) {
         <div class="glass-card p-6 ${v.is_winner ? 'ring-2 ring-green-400' : ''}" style="${v.is_winner ? 'background: var(--success-bg);' : ''}">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-sm font-semibold" style="color: ${v.is_winner ? '#15803d' : 'var(--text-primary)'};">
-                    ${v.label} ${v.is_winner ? '(Winner)' : ''}
+                    ${esc(v.label)} ${v.is_winner ? '(Winner)' : ''}
                 </span>
                 <span class="text-lg font-bold ${v.virality_score >= 65 ? 'score-viral' : v.virality_score >= 40 ? 'score-medium' : 'score-low'}">${v.virality_score || 0}</span>
             </div>
@@ -209,7 +209,7 @@ async function showVariations(expId) {
                 <span>${v.tone || ''}</span>
                 <span>${v.word_count || 0}w</span>
             </div>
-            <pre class="text-xs whitespace-pre-wrap rounded-xl p-4 max-h-64 overflow-auto" style="color: var(--text-secondary); background: var(--surface-primary); border: 1px solid var(--border-subtle);">${v.content || ''}</pre>
+            <pre class="text-xs whitespace-pre-wrap rounded-xl p-4 max-h-64 overflow-auto" style="color: var(--text-secondary); background: var(--surface-primary); border: 1px solid var(--border-subtle);">${esc(v.content || '')}</pre>
         </div>
     `).join('');
 
@@ -228,6 +228,7 @@ async function runExperiment() {
     try {
         const res = await fetch('/api/autoresearch/run', { method: 'POST' });
         const data = await res.json();
+        if (!res.ok) { showToast(data.error || 'Autoresearch could not run', 'error'); return; }
         alert(`Autoresearch complete: ${data.experiments_run} experiments run`);
         loadSummary();
         loadExperiments();

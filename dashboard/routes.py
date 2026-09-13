@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 from sqlalchemy import func, Integer
 from sqlalchemy.orm import Session
@@ -13,13 +12,13 @@ from sqlalchemy.orm import Session
 from auth.token_manager import TokenManager
 from config import settings
 from content.generator import ContentGenerator
+from dashboard.common import parse_client_dt, render, templates, to_iso
 from database.engine import get_db
 from database.models import Competitor, CompetitorPost, ContentCalendar, PostPerformance, PostStatus, QueuedPost, ResearchItem
 from linkedin.poster import LinkedInPoster
 from post_queue.post_queue import PostQueue
 
 router = APIRouter(tags=["dashboard"])
-templates = Jinja2Templates(directory="dashboard/templates")
 
 
 # ── Pydantic models for request bodies ────────────────────────
@@ -116,122 +115,58 @@ class IdeaRequest(BaseModel):
 
 # ── Page routes (HTML) ────────────────────────────────────────
 
-@router.get("/", response_class=HTMLResponse)
-async def dashboard_home(request: Request, db: Session = Depends(get_db)):
+@router.get("/queue", response_class=HTMLResponse)
+def queue_page(request: Request, db: Session = Depends(get_db)):
     pq = PostQueue(db)
-    tm = TokenManager(db)
-    stats = pq.get_stats()
-    auth_status = tm.get_token_status()
-    recent_posted = pq.get_posted(limit=5)
-    return templates.TemplateResponse(
-        "queue.html",
-        {
-            "request": request,
-            "stats": stats,
-            "auth_status": auth_status,
-            "recent_posted": recent_posted,
-            "page": "queue",
-        },
-    )
+    return render(request, "queue.html", "queue", db, stats=pq.get_stats(), recent_posted=pq.get_posted(limit=5))
 
 
 @router.get("/history", response_class=HTMLResponse)
-async def history_page(request: Request, db: Session = Depends(get_db)):
-    pq = PostQueue(db)
-    stats = pq.get_stats()
-    return templates.TemplateResponse(
-        "history.html",
-        {"request": request, "stats": stats, "page": "history"},
-    )
+def history_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "history.html", "history", db, stats=PostQueue(db).get_stats())
 
 
 @router.get("/analytics", response_class=HTMLResponse)
-async def analytics_page(request: Request, db: Session = Depends(get_db)):
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "analytics.html",
-        {"request": request, "auth_status": auth_status, "page": "analytics"},
-    )
+def analytics_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "analytics.html", "analytics", db)
 
 
 @router.get("/learnings", response_class=HTMLResponse)
-async def learnings_page(request: Request, db: Session = Depends(get_db)):
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "learnings.html",
-        {"request": request, "auth_status": auth_status, "page": "learnings"},
-    )
+def learnings_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "learnings.html", "learnings", db)
 
 
 @router.get("/competitors", response_class=HTMLResponse)
-async def competitors_page(request: Request, db: Session = Depends(get_db)):
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "competitors.html",
-        {"request": request, "auth_status": auth_status, "page": "competitors"},
-    )
+def competitors_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "competitors.html", "competitors", db)
 
 
 @router.get("/competitors/{competitor_id}", response_class=HTMLResponse)
-async def competitor_detail_page(competitor_id: int, request: Request, db: Session = Depends(get_db)):
-    comp = db.query(Competitor).get(competitor_id)
-    if not comp:
+def competitor_detail_page(competitor_id: int, request: Request, db: Session = Depends(get_db)):
+    if not db.get(Competitor, competitor_id):
         return HTMLResponse("<h1>Competitor not found</h1>", status_code=404)
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "competitor_detail.html",
-        {"request": request, "auth_status": auth_status, "page": "competitors", "competitor_id": competitor_id},
-    )
+    return render(request, "competitor_detail.html", "competitors", db, competitor_id=competitor_id)
 
 
 @router.get("/research", response_class=HTMLResponse)
-async def research_page(request: Request, db: Session = Depends(get_db)):
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "research.html",
-        {"request": request, "auth_status": auth_status, "page": "research"},
-    )
-
-
-@router.get("/settings", response_class=HTMLResponse)
-async def settings_page(request: Request, db: Session = Depends(get_db)):
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "settings.html",
-        {"request": request, "auth_status": auth_status, "page": "settings"},
-    )
+def research_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "research.html", "research", db)
 
 
 @router.get("/idea", response_class=HTMLResponse)
-async def idea_page(request: Request, db: Session = Depends(get_db)):
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "idea.html",
-        {"request": request, "auth_status": auth_status, "page": "idea"},
-    )
+def idea_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "idea.html", "idea", db)
 
 
 @router.get("/schedule", response_class=HTMLResponse)
-async def schedule_page(request: Request, db: Session = Depends(get_db)):
-    pq = PostQueue(db)
-    stats = pq.get_stats()
-    return templates.TemplateResponse(
-        "schedule.html",
-        {"request": request, "stats": stats, "page": "schedule"},
-    )
+def schedule_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "schedule.html", "schedule", db, stats=PostQueue(db).get_stats())
 
 
 # ── API routes (JSON) ────────────────────────────────────────
 
 @router.get("/api/queue")
-async def api_get_queue(db: Session = Depends(get_db)):
+def api_get_queue(db: Session = Depends(get_db)):
     pq = PostQueue(db)
     posts = pq.get_queued()
     return [
@@ -258,36 +193,48 @@ async def api_get_queue(db: Session = Depends(get_db)):
             "virality_score": p.virality_score,
             "virality_breakdown": p.virality_breakdown,
             "virality_performance": p.virality_performance,
-            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "quality_score": p.quality_score,
+            "quality_report": p.quality_report,
+            "source": p.source,
+            "formula_id": p.formula_id,
+            "goal": p.goal,
+            "first_comment": p.first_comment,
+            "created_at": to_iso(p.created_at),
         }
         for p in posts
     ]
 
 
 @router.get("/api/stats")
-async def api_get_stats(db: Session = Depends(get_db)):
+def api_get_stats(db: Session = Depends(get_db)):
     pq = PostQueue(db)
     return pq.get_stats()
 
 
 @router.post("/api/queue/{post_id}/approve")
-async def api_approve(post_id: int, body: ApproveRequest, db: Session = Depends(get_db)):
+def api_approve(post_id: int, body: ApproveRequest, db: Session = Depends(get_db)):
     pq = PostQueue(db)
     scheduled_time = None
     if body.scheduled_time:
         try:
-            scheduled_time = datetime.fromisoformat(body.scheduled_time)
+            scheduled_time = parse_client_dt(body.scheduled_time)
         except ValueError:
             return JSONResponse({"error": "Invalid datetime format"}, status_code=400)
+        if scheduled_time <= datetime.utcnow():
+            return JSONResponse({"error": "Pick a time in the future"}, status_code=400)
 
     post = pq.approve(post_id, edited_content=body.edited_content, scheduled_time=scheduled_time)
     if not post:
         return JSONResponse({"error": "Post not found or cannot be approved"}, status_code=404)
+    if body.edited_content:
+        from content.pipeline import refresh_quality
+        refresh_quality(post)
+        db.commit()
     return {"status": "approved", "id": post.id, "post_status": post.status.value}
 
 
 @router.post("/api/queue/{post_id}/reject")
-async def api_reject(post_id: int, body: RejectRequest, db: Session = Depends(get_db)):
+def api_reject(post_id: int, body: RejectRequest, db: Session = Depends(get_db)):
     pq = PostQueue(db)
     post = pq.reject(post_id, reason=body.reason)
     if not post:
@@ -301,20 +248,24 @@ async def api_reject(post_id: int, body: RejectRequest, db: Session = Depends(ge
 
 
 @router.post("/api/queue/{post_id}/edit")
-async def api_edit(post_id: int, body: EditRequest, db: Session = Depends(get_db)):
+def api_edit(post_id: int, body: EditRequest, db: Session = Depends(get_db)):
     pq = PostQueue(db)
     post = pq.edit_content(post_id, body.content)
     if not post:
         return JSONResponse({"error": "Post not found or cannot be edited"}, status_code=404)
-    return {"status": "edited", "id": post.id, "word_count": post.word_count}
+    from content.pipeline import refresh_quality
+    report = refresh_quality(post)
+    db.commit()
+    return {"status": "edited", "id": post.id, "word_count": post.word_count,
+            "quality_score": report["score"], "quality_status": report["status"]}
 
 
 @router.post("/api/queue/{post_id}/regenerate")
-async def api_regenerate(post_id: int, body: RegenerateRequest, db: Session = Depends(get_db)):
+def api_regenerate(post_id: int, body: RegenerateRequest, db: Session = Depends(get_db)):
     gen = ContentGenerator(db)
     new_post = gen.regenerate(post_id, feedback=body.feedback)
     if not new_post:
-        return JSONResponse({"error": "Failed to regenerate"}, status_code=500)
+        return JSONResponse({"error": gen.last_error or "Failed to regenerate"}, status_code=502)
     return {
         "status": "regenerated",
         "new_id": new_post.id,
@@ -323,43 +274,54 @@ async def api_regenerate(post_id: int, body: RegenerateRequest, db: Session = De
 
 
 @router.post("/api/queue/bulk-approve")
-async def api_bulk_approve(body: BulkActionRequest, db: Session = Depends(get_db)):
+def api_bulk_approve(body: BulkActionRequest, db: Session = Depends(get_db)):
     pq = PostQueue(db)
     approved = pq.bulk_approve(body.post_ids)
     return {"status": "bulk_approved", "count": len(approved)}
 
 
 @router.post("/api/queue/bulk-reject")
-async def api_bulk_reject(body: BulkActionRequest, db: Session = Depends(get_db)):
+def api_bulk_reject(body: BulkActionRequest, db: Session = Depends(get_db)):
     pq = PostQueue(db)
     rejected = pq.bulk_reject(body.post_ids, reason=body.reason)
     return {"status": "bulk_rejected", "count": len(rejected)}
 
 
 @router.post("/api/generate")
-async def api_generate(body: GenerateRequest, db: Session = Depends(get_db)):
+def api_generate(body: GenerateRequest, db: Session = Depends(get_db)):
     gen = ContentGenerator(db)
     if body.template_name or body.topic:
         post = gen.generate_single(
             template_name=body.template_name, topic=body.topic, tone=body.tone
         )
-        return {"status": "generated", "count": 1 if post else 0}
+        count = 1 if post else 0
     else:
-        posts = gen.generate_batch(count=body.count)
-        return {"status": "generated", "count": len(posts)}
+        count = len(gen.generate_batch(count=max(1, min(body.count, 10))))
+    if count == 0:
+        return JSONResponse({"error": gen.last_error or "No drafts were generated. Check the logs."}, status_code=502)
+    return {"status": "generated", "count": count}
 
 
 @router.post("/api/post-now/{post_id}")
 async def api_post_now(post_id: int, db: Session = Depends(get_db)):
-    poster = LinkedInPoster(db)
-    success = await poster.post_immediately(post_id)
-    if success:
-        return {"status": "posted", "id": post_id}
-    return JSONResponse({"error": "Failed to post"}, status_code=500)
+    """Publish an APPROVED or SCHEDULED post immediately (never a queued one)."""
+    result = await LinkedInPoster(db).post_immediately(post_id)
+    if result.ok:
+        return {"status": "posted", "id": post_id, "message": result.message}
+    return JSONResponse({"error": result.message, "code": result.code}, status_code=result.http_status)
+
+
+@router.post("/api/queue/{post_id}/retry")
+def api_retry_failed(post_id: int, db: Session = Depends(get_db)):
+    """Send a failed post back to Approved (or to review if it was never approved)."""
+    post = PostQueue(db).retry_failed(post_id)
+    if not post:
+        return JSONResponse({"error": "Post not found or not failed"}, status_code=404)
+    return {"status": post.status.value, "id": post.id}
 
 
 @router.post("/api/research/run")
-async def api_run_research(db: Session = Depends(get_db)):
+def api_run_research(db: Session = Depends(get_db)):
     from research.research_engine import ResearchEngine
 
     engine = ResearchEngine(db)
@@ -368,16 +330,18 @@ async def api_run_research(db: Session = Depends(get_db)):
 
 
 @router.get("/api/history")
-async def api_get_history(
+def api_get_history(
     status: str = "posted",
     limit: int = 50,
     db: Session = Depends(get_db),
 ):
     pq = PostQueue(db)
     if status == "approved":
-        posts = pq.get_approved()
+        posts = pq.get_approved() + pq.get_scheduled()
     elif status == "rejected":
         posts = pq.get_rejected(limit=limit)
+    elif status == "failed":
+        posts = pq.get_failed(limit=limit)
     else:
         posts = pq.get_posted(limit=limit)
 
@@ -388,11 +352,13 @@ async def api_get_history(
             "template_name": p.template_name,
             "topic": p.topic,
             "status": p.status.value,
-            "posted_at": p.posted_at.isoformat() if p.posted_at else None,
-            "created_at": p.created_at.isoformat() if p.created_at else None,
-            "scheduled_time": p.scheduled_time.isoformat() if p.scheduled_time else None,
+            "posted_at": to_iso(p.posted_at),
+            "created_at": to_iso(p.created_at),
+            "scheduled_time": to_iso(p.scheduled_time),
             "linkedin_post_id": p.linkedin_post_id,
             "rejection_reason": p.rejection_reason,
+            "last_error": p.last_error,
+            "approved_at": to_iso(p.approved_at),
             "has_image": p.has_image or False,
             "image_path": p.image_path,
             "has_video": p.has_video or False,
@@ -404,13 +370,14 @@ async def api_get_history(
             "likes": p.performance.likes if p.performance else 0,
             "comments": p.performance.comments if p.performance else 0,
             "shares": p.performance.shares if p.performance else 0,
+            "impressions": p.performance.impressions if p.performance else 0,
         }
         for p in posts
     ]
 
 
 @router.delete("/api/queue/{post_id}")
-async def api_delete_post(post_id: int, db: Session = Depends(get_db)):
+def api_delete_post(post_id: int, db: Session = Depends(get_db)):
     pq = PostQueue(db)
     if pq.delete_post(post_id):
         return {"status": "deleted", "id": post_id}
@@ -418,7 +385,7 @@ async def api_delete_post(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/api/queue/{post_id}/repost")
-async def api_repost(post_id: int, db: Session = Depends(get_db)):
+def api_repost(post_id: int, db: Session = Depends(get_db)):
     """Duplicate a posted/rejected post back into the queue for reposting."""
     original = db.query(QueuedPost).filter(QueuedPost.id == post_id).first()
     if not original:
@@ -444,7 +411,12 @@ async def api_repost(post_id: int, db: Session = Depends(get_db)):
         virality_score=original.virality_score,
         virality_performance=original.virality_performance,
         virality_breakdown=original.virality_breakdown,
+        source="repost",
+        formula_id=original.formula_id,
+        goal=original.goal,
     )
+    from content.pipeline import refresh_quality
+    refresh_quality(new_post)
     db.add(new_post)
     db.commit()
     db.refresh(new_post)
@@ -455,7 +427,7 @@ async def api_repost(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/schedule")
-async def api_get_schedule(db: Session = Depends(get_db)):
+def api_get_schedule(db: Session = Depends(get_db)):
     """Return all scheduled posts and available (approved/queued) posts."""
     pq = PostQueue(db)
     scheduled = pq.get_scheduled()
@@ -471,7 +443,7 @@ async def api_get_schedule(db: Session = Depends(get_db)):
                 "template_name": p.template_name,
                 "topic": p.topic,
                 "status": p.status.value,
-                "scheduled_time": p.scheduled_time.isoformat() if p.scheduled_time else None,
+                "scheduled_time": to_iso(p.scheduled_time),
                 "has_image": p.has_image or False,
                 "image_path": p.image_path,
                 "has_video": p.has_video or False,
@@ -480,7 +452,7 @@ async def api_get_schedule(db: Session = Depends(get_db)):
                 "word_count": p.word_count,
                 "virality_score": p.virality_score,
                 "virality_performance": p.virality_performance,
-                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "created_at": to_iso(p.created_at),
             }
             for p in scheduled
         ],
@@ -493,7 +465,7 @@ async def api_get_schedule(db: Session = Depends(get_db)):
                 "status": p.status.value,
                 "word_count": p.word_count,
                 "virality_score": p.virality_score,
-                "created_at": p.created_at.isoformat() if p.created_at else None,
+                "created_at": to_iso(p.created_at),
             }
             for p in approved + queued
         ],
@@ -501,12 +473,14 @@ async def api_get_schedule(db: Session = Depends(get_db)):
 
 
 @router.post("/api/queue/{post_id}/schedule")
-async def api_schedule_post(post_id: int, body: ScheduleRequest, db: Session = Depends(get_db)):
-    """Schedule a post for a specific date/time."""
+def api_schedule_post(post_id: int, body: ScheduleRequest, db: Session = Depends(get_db)):
+    """Schedule a post for a specific date/time (local time in POSTING_TIMEZONE)."""
     try:
-        scheduled_time = datetime.fromisoformat(body.scheduled_time)
+        scheduled_time = parse_client_dt(body.scheduled_time)
     except ValueError:
         return JSONResponse({"error": "Invalid datetime format"}, status_code=400)
+    if scheduled_time <= datetime.utcnow():
+        return JSONResponse({"error": "Pick a time in the future"}, status_code=400)
 
     pq = PostQueue(db)
     post = pq.schedule(post_id, scheduled_time)
@@ -515,18 +489,18 @@ async def api_schedule_post(post_id: int, body: ScheduleRequest, db: Session = D
     return {
         "status": "scheduled",
         "id": post.id,
-        "scheduled_time": post.scheduled_time.isoformat(),
+        "scheduled_time": to_iso(post.scheduled_time),
     }
 
 
 @router.post("/api/queue/{post_id}/unschedule")
-async def api_unschedule_post(post_id: int, db: Session = Depends(get_db)):
-    """Remove scheduling from a post, reverting to approved status."""
+def api_unschedule_post(post_id: int, db: Session = Depends(get_db)):
+    """Remove scheduling: approved posts return to Approved, others to review."""
     pq = PostQueue(db)
     post = pq.unschedule(post_id)
     if not post:
         return JSONResponse({"error": "Post not found or not scheduled"}, status_code=404)
-    return {"status": "unscheduled", "id": post.id}
+    return {"status": "unscheduled", "id": post.id, "post_status": post.status.value}
 
 
 # ── Content Calendar API routes ───────────────────────────────
@@ -536,7 +510,7 @@ DAY_NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
 
 
 @router.get("/api/calendar")
-async def api_get_calendar(db: Session = Depends(get_db)):
+def api_get_calendar(db: Session = Depends(get_db)):
     """Return all content calendar time slots."""
     slots = db.query(ContentCalendar).order_by(ContentCalendar.day_of_week, ContentCalendar.time_slot).all()
     return {
@@ -557,10 +531,14 @@ async def api_get_calendar(db: Session = Depends(get_db)):
 
 
 @router.post("/api/calendar")
-async def api_add_calendar_slot(body: CalendarSlotRequest, db: Session = Depends(get_db)):
+def api_add_calendar_slot(body: CalendarSlotRequest, db: Session = Depends(get_db)):
     """Add or update a content calendar time slot."""
+    import re
+
     if not (0 <= body.day_of_week <= 6):
         return JSONResponse({"error": "day_of_week must be 0-6"}, status_code=400)
+    if not re.fullmatch(r"([01]\d|2[0-3]):[0-5]\d", body.time_slot or ""):
+        return JSONResponse({"error": "Time must look like 09:30"}, status_code=400)
 
     # Check for duplicate
     existing = (
@@ -588,7 +566,7 @@ async def api_add_calendar_slot(body: CalendarSlotRequest, db: Session = Depends
 
 
 @router.delete("/api/calendar/{slot_id}")
-async def api_delete_calendar_slot(slot_id: int, db: Session = Depends(get_db)):
+def api_delete_calendar_slot(slot_id: int, db: Session = Depends(get_db)):
     """Delete a content calendar time slot."""
     slot = db.query(ContentCalendar).filter(ContentCalendar.id == slot_id).first()
     if not slot:
@@ -599,7 +577,7 @@ async def api_delete_calendar_slot(slot_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/next-slots")
-async def api_get_next_slots(db: Session = Depends(get_db)):
+def api_get_next_slots(db: Session = Depends(get_db)):
     """Show when the next 5 posts will go out based on the content calendar."""
     from zoneinfo import ZoneInfo
 
@@ -646,33 +624,26 @@ async def api_get_next_slots(db: Session = Depends(get_db)):
 
 
 @router.post("/api/queue/{post_id}/generate-image")
-async def api_generate_image(post_id: int, db: Session = Depends(get_db)):
-    """Generate an image for a queued post using Gemini (Nano Banana)."""
+def api_generate_image(post_id: int, db: Session = Depends(get_db)):
+    """Generate an image for a queued post (kie.ai, or Gemini when only that key is set)."""
+    from content.image_generator import ImageGenerator
     try:
-        from content.image_generator import ImageGenerator
         gen = ImageGenerator()
-        result = gen.generate_for_post(db, post_id)
-        if result.get("success"):
-            return {
-                "status": "generated",
-                "id": post_id,
-                "image_path": result.get("image_path", ""),
-            }
-        return JSONResponse({"error": result.get("error", "Unknown error")}, status_code=500)
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).error("Image generation failed for post %d: %s", post_id, e)
-        return JSONResponse({"error": "Image generation failed"}, status_code=500)
+    result = gen.generate_for_post(db, post_id)
+    if result.get("success"):
+        return {"status": "generated", "id": post_id, "image_path": result.get("image_path", ""),
+                "provider": result.get("provider"), "credits": result.get("credits")}
+    status = 404 if result.get("error") == "Post not found" else 502
+    return JSONResponse({"error": result.get("error", "Image generation failed")}, status_code=status)
 
 
 @router.delete("/api/queue/{post_id}/image")
-async def api_remove_image(post_id: int, db: Session = Depends(get_db)):
-    """Remove the image from a queued post."""
-    from content.image_generator import ImageGenerator
-    gen = ImageGenerator()
-    if gen.remove_image(db, post_id):
+def api_remove_image(post_id: int, db: Session = Depends(get_db)):
+    """Remove the image from a queued post (needs no image key)."""
+    from content.image_generator import remove_post_image
+    if remove_post_image(db, post_id):
         return {"status": "removed", "id": post_id}
     return JSONResponse({"error": "Post not found"}, status_code=404)
 
@@ -752,9 +723,17 @@ async def api_generate_gif(post_id: int, body: GifGenerateRequest = None, db: Se
             gif_params["gif_type"] = body.gif_type
 
         if body.mode == "screen_record":
+            from utils.netguard import UnsafeURLError, check_public_url
+
+            if not settings.SCREEN_RECORD_ENABLED:
+                return JSONResponse({"error": "Screen recording is turned off in Settings"}, status_code=400)
             url = gif_params.get("url")
             if not url:
                 return JSONResponse({"error": "url is required for screen_record mode"}, status_code=400)
+            try:
+                check_public_url(url)
+            except UnsafeURLError as e:
+                return JSONResponse({"error": str(e)}, status_code=400)
             actions = gif_params.get("actions")
             result = await gen.generate_screen_record_for_post(db, post_id, url, actions)
         elif body.mode == "auto" or (body.mode == "programmatic" and not body.gif_type):
@@ -774,7 +753,7 @@ async def api_generate_gif(post_id: int, body: GifGenerateRequest = None, db: Se
 
 
 @router.post("/api/queue/{post_id}/plan-gif")
-async def api_plan_gif(post_id: int, db: Session = Depends(get_db)):
+def api_plan_gif(post_id: int, db: Session = Depends(get_db)):
     """Use AI to plan the best GIF type for a post."""
     post = db.query(QueuedPost).filter(QueuedPost.id == post_id).first()
     if not post:
@@ -788,7 +767,7 @@ async def api_plan_gif(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/api/queue/{post_id}/video")
-async def api_remove_video(post_id: int, db: Session = Depends(get_db)):
+def api_remove_video(post_id: int, db: Session = Depends(get_db)):
     """Remove the video/GIF from a queued post."""
     from content.gif_generator import GifGenerator
     gen = GifGenerator()
@@ -861,7 +840,7 @@ async def api_deep_research(item_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/analytics/overview")
-async def api_analytics_overview(
+def api_analytics_overview(
     days: int = 30,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -950,7 +929,7 @@ async def api_analytics_overview(
 
 
 @router.get("/api/analytics/timeline")
-async def api_analytics_timeline(
+def api_analytics_timeline(
     days: int = 30,
     start_date: str | None = None,
     end_date: str | None = None,
@@ -1001,7 +980,7 @@ async def api_analytics_timeline(
 
 
 @router.get("/api/analytics/templates")
-async def api_analytics_templates(db: Session = Depends(get_db)):
+def api_analytics_templates(db: Session = Depends(get_db)):
     """Return template performance comparison sorted by engagement score."""
     posts = (
         db.query(QueuedPost)
@@ -1044,7 +1023,7 @@ async def api_analytics_templates(db: Session = Depends(get_db)):
 
 
 @router.get("/api/analytics/posts")
-async def api_analytics_posts(limit: int = 10, offset: int = 0, db: Session = Depends(get_db)):
+def api_analytics_posts(limit: int = 10, offset: int = 0, db: Session = Depends(get_db)):
     """Return individual post performance sorted by posted_at descending."""
     base_query = db.query(QueuedPost).filter(QueuedPost.status == PostStatus.POSTED)
     total = base_query.count()
@@ -1072,7 +1051,7 @@ async def api_analytics_posts(limit: int = 10, offset: int = 0, db: Session = De
             "content": p.content[:150] + "..." if len(p.content) > 150 else p.content,
             "template_name": p.template_name,
             "hook_type": p.hook_type,
-            "posted_at": p.posted_at.isoformat() if p.posted_at else None,
+            "posted_at": to_iso(p.posted_at),
             "likes": likes,
             "comments": comments,
             "shares": shares,
@@ -1084,7 +1063,7 @@ async def api_analytics_posts(limit: int = 10, offset: int = 0, db: Session = De
 
 
 @router.get("/api/analytics/best-times")
-async def api_analytics_best_times(db: Session = Depends(get_db)):
+def api_analytics_best_times(db: Session = Depends(get_db)):
     """Return best posting times analysis based on historical engagement."""
     posts = (
         db.query(QueuedPost)
@@ -1124,7 +1103,7 @@ async def api_analytics_best_times(db: Session = Depends(get_db)):
 
 
 @router.get("/api/analytics/growth")
-async def api_analytics_growth(db: Session = Depends(get_db)):
+def api_analytics_growth(db: Session = Depends(get_db)):
     """Return weekly growth metrics."""
     posts = (
         db.query(QueuedPost)
@@ -1177,16 +1156,6 @@ async def api_refresh_engagement(db: Session = Depends(get_db)):
     tracker = PerformanceTracker(db)
     updated = await tracker.fetch_engagement_from_linkedin()
     return {"status": "complete", "posts_updated": updated}
-
-
-@router.post("/api/analytics/generate-sample-data")
-async def api_generate_sample_data(db: Session = Depends(get_db)):
-    """Generate sample performance data for testing the dashboard."""
-    from analytics.performance_tracker import PerformanceTracker
-
-    tracker = PerformanceTracker(db)
-    created = tracker.create_sample_performance_data()
-    return {"status": "complete", "records_created": created}
 
 
 @router.post("/api/analytics/import-history")
@@ -1297,7 +1266,7 @@ async def api_import_post_history(db: Session = Depends(get_db)):
 
 
 @router.get("/api/analytics/imported-posts")
-async def api_get_imported_posts(limit: int = 50, db: Session = Depends(get_db)):
+def api_get_imported_posts(limit: int = 50, db: Session = Depends(get_db)):
     """Get imported LinkedIn posts sorted by engagement for learning."""
     posts = (
         db.query(QueuedPost)
@@ -1321,7 +1290,7 @@ async def api_get_imported_posts(limit: int = 50, db: Session = Depends(get_db))
             "id": p.id,
             "content": p.content[:300] + "..." if len(p.content) > 300 else p.content,
             "full_content": p.content,
-            "posted_at": p.posted_at.isoformat() if p.posted_at else None,
+            "posted_at": to_iso(p.posted_at),
             "linkedin_post_id": p.linkedin_post_id,
             "likes": likes,
             "comments": comments,
@@ -1339,7 +1308,7 @@ async def api_get_imported_posts(limit: int = 50, db: Session = Depends(get_db))
 
 
 @router.get("/api/competitors")
-async def api_get_competitors(db: Session = Depends(get_db)):
+def api_get_competitors(db: Session = Depends(get_db)):
     """List all competitors with their post counts and average engagement."""
     comps = db.query(Competitor).order_by(Competitor.created_at.desc()).all()
 
@@ -1384,16 +1353,16 @@ async def api_get_competitors(db: Session = Depends(get_db)):
             "avg_comments": stats["avg_comments"],
             "avg_shares": stats["avg_shares"],
             "posting_frequency": c.posting_frequency,
-            "last_scraped_at": c.last_scraped_at.isoformat() if c.last_scraped_at else None,
+            "last_scraped_at": to_iso(c.last_scraped_at),
             "scrape_status": c.scrape_status,
-            "created_at": c.created_at.isoformat() if c.created_at else None,
-            "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            "created_at": to_iso(c.created_at),
+            "updated_at": to_iso(c.updated_at),
         })
     return result
 
 
 @router.post("/api/competitors")
-async def api_create_competitor(body: CompetitorCreate, db: Session = Depends(get_db)):
+def api_create_competitor(body: CompetitorCreate, db: Session = Depends(get_db)):
     """Create a new competitor."""
     comp = Competitor(
         name=body.name,
@@ -1408,12 +1377,12 @@ async def api_create_competitor(body: CompetitorCreate, db: Session = Depends(ge
         "status": "created",
         "id": comp.id,
         "name": comp.name,
-        "created_at": comp.created_at.isoformat() if comp.created_at else None,
+        "created_at": to_iso(comp.created_at),
     }
 
 
 @router.put("/api/competitors/{competitor_id}")
-async def api_update_competitor(competitor_id: int, body: CompetitorCreate, db: Session = Depends(get_db)):
+def api_update_competitor(competitor_id: int, body: CompetitorCreate, db: Session = Depends(get_db)):
     """Update an existing competitor."""
     comp = db.query(Competitor).get(competitor_id)
     if not comp:
@@ -1428,12 +1397,12 @@ async def api_update_competitor(competitor_id: int, body: CompetitorCreate, db: 
         "status": "updated",
         "id": comp.id,
         "name": comp.name,
-        "updated_at": comp.updated_at.isoformat() if comp.updated_at else None,
+        "updated_at": to_iso(comp.updated_at),
     }
 
 
 @router.delete("/api/competitors/{competitor_id}")
-async def api_delete_competitor(competitor_id: int, db: Session = Depends(get_db)):
+def api_delete_competitor(competitor_id: int, db: Session = Depends(get_db)):
     """Delete a competitor and cascade-delete all their posts."""
     comp = db.query(Competitor).get(competitor_id)
     if not comp:
@@ -1444,7 +1413,7 @@ async def api_delete_competitor(competitor_id: int, db: Session = Depends(get_db
 
 
 @router.get("/api/competitors/{competitor_id}/posts")
-async def api_get_competitor_posts(competitor_id: int, db: Session = Depends(get_db)):
+def api_get_competitor_posts(competitor_id: int, db: Session = Depends(get_db)):
     """Get all posts for a specific competitor, sorted by likes descending."""
     comp = db.query(Competitor).get(competitor_id)
     if not comp:
@@ -1464,7 +1433,7 @@ async def api_get_competitor_posts(competitor_id: int, db: Session = Depends(get
             "content": p.content,
             "post_url": p.post_url,
             "linkedin_post_id": p.linkedin_post_id,
-            "post_date": p.post_date.isoformat() if p.post_date else None,
+            "post_date": to_iso(p.post_date),
             "likes": p.likes,
             "comments": p.comments,
             "shares": p.shares,
@@ -1482,14 +1451,14 @@ async def api_get_competitor_posts(competitor_id: int, db: Session = Depends(get
             "is_saved": p.is_saved,
             "recreated": p.recreated,
             "source": p.source,
-            "created_at": p.created_at.isoformat() if p.created_at else None,
+            "created_at": to_iso(p.created_at),
         }
         for p in posts
     ]
 
 
 @router.post("/api/competitors/{competitor_id}/posts")
-async def api_create_competitor_post(competitor_id: int, body: CompetitorPostCreate, db: Session = Depends(get_db)):
+def api_create_competitor_post(competitor_id: int, body: CompetitorPostCreate, db: Session = Depends(get_db)):
     """Add a post for a specific competitor."""
     comp = db.query(Competitor).get(competitor_id)
     if not comp:
@@ -1535,7 +1504,7 @@ async def api_create_competitor_post(competitor_id: int, body: CompetitorPostCre
 
 
 @router.delete("/api/competitors/posts/{post_id}")
-async def api_delete_competitor_post(post_id: int, db: Session = Depends(get_db)):
+def api_delete_competitor_post(post_id: int, db: Session = Depends(get_db)):
     """Delete a specific competitor post and recalculate competitor stats."""
     post = db.query(CompetitorPost).get(post_id)
     if not post:
@@ -1560,7 +1529,7 @@ async def api_delete_competitor_post(post_id: int, db: Session = Depends(get_db)
 
 
 @router.post("/api/competitors/posts/{post_id}/save")
-async def api_toggle_save_post(post_id: int, db: Session = Depends(get_db)):
+def api_toggle_save_post(post_id: int, db: Session = Depends(get_db)):
     """Toggle the is_saved flag on a competitor post."""
     post = db.query(CompetitorPost).get(post_id)
     if not post:
@@ -1571,7 +1540,7 @@ async def api_toggle_save_post(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/competitors/{competitor_id}/detail")
-async def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db)):
+def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db)):
     """Full detail view for a single competitor: profile, posts, engagement analytics, content patterns."""
     comp = db.query(Competitor).get(competitor_id)
     if not comp:
@@ -1641,7 +1610,7 @@ async def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db
     timeline = []
     for p in sorted(posts, key=lambda x: x.post_date or x.created_at):
         timeline.append({
-            "date": (p.post_date or p.created_at).isoformat() if (p.post_date or p.created_at) else None,
+            "date": to_iso(p.post_date or p.created_at),
             "likes": p.likes,
             "comments": p.comments,
             "shares": p.shares,
@@ -1669,7 +1638,7 @@ async def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db
             "id": p.id,
             "content": p.content,
             "post_url": p.post_url,
-            "post_date": p.post_date.isoformat() if p.post_date else None,
+            "post_date": to_iso(p.post_date),
             "likes": p.likes,
             "comments": p.comments,
             "shares": p.shares,
@@ -1703,9 +1672,9 @@ async def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db
             "headline": comp.headline,
             "follower_count": comp.follower_count or 0,
             "posting_frequency": comp.posting_frequency,
-            "last_scraped_at": comp.last_scraped_at.isoformat() if comp.last_scraped_at else None,
+            "last_scraped_at": to_iso(comp.last_scraped_at),
             "scrape_status": comp.scrape_status,
-            "created_at": comp.created_at.isoformat() if comp.created_at else None,
+            "created_at": to_iso(comp.created_at),
         },
         "stats": {
             "total_posts": total_posts,
@@ -1734,7 +1703,7 @@ async def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db
                 "content_format": p.content_format,
                 "topic": p.topic,
                 "post_url": p.post_url,
-                "post_date": p.post_date.isoformat() if p.post_date else None,
+                "post_date": to_iso(p.post_date),
             }
             for p in top_posts
         ],
@@ -1752,7 +1721,7 @@ async def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db
 
 
 @router.get("/api/competitors/insights")
-async def api_competitors_insights(db: Session = Depends(get_db)):
+def api_competitors_insights(db: Session = Depends(get_db)):
     """Return aggregate insights across all competitors."""
     total_competitors = db.query(func.count(Competitor.id)).scalar() or 0
     total_posts_tracked = db.query(func.count(CompetitorPost.id)).scalar() or 0
@@ -1848,7 +1817,7 @@ async def api_competitors_insights(db: Session = Depends(get_db)):
 
 
 @router.post("/api/competitors/scrape-all")
-async def api_scrape_all_competitors(db: Session = Depends(get_db)):
+def api_scrape_all_competitors(db: Session = Depends(get_db)):
     """Trigger a full scrape of all competitors (profile + posts + AI analysis)."""
     from research.competitor_scraper import CompetitorScraper
 
@@ -1858,17 +1827,25 @@ async def api_scrape_all_competitors(db: Session = Depends(get_db)):
 
 
 @router.post("/api/competitors/{competitor_id}/scrape")
-async def api_scrape_competitor(competitor_id: int, db: Session = Depends(get_db)):
+def api_scrape_competitor(competitor_id: int, db: Session = Depends(get_db)):
     """Scrape a single competitor's profile and posts."""
     comp = db.query(Competitor).get(competitor_id)
     if not comp:
         return JSONResponse({"error": "Competitor not found"}, status_code=404)
 
+    from research.apify_linkedin import ApifyError
     from research.competitor_scraper import CompetitorScraper
 
     scraper = CompetitorScraper(db)
     try:
         new_posts = scraper.scrape_competitor(comp)
+    except ApifyError as e:
+        comp.scrape_status, comp.scrape_error = "failed", str(e)
+        db.commit()
+        return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    try:
         analyzed = scraper._analyze_unanalyzed_posts(comp)
         return {
             "status": "success",
@@ -1883,7 +1860,7 @@ async def api_scrape_competitor(competitor_id: int, db: Session = Depends(get_db
 
 
 @router.post("/api/competitors/posts/{post_id}/analyze")
-async def api_analyze_post(post_id: int, db: Session = Depends(get_db)):
+def api_analyze_post(post_id: int, db: Session = Depends(get_db)):
     """Run AI analysis on a single competitor post."""
     from research.competitor_scraper import CompetitorScraper
 
@@ -1905,7 +1882,7 @@ async def api_analyze_post(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/api/competitors/posts/{post_id}/recreate")
-async def api_recreate_from_competitor(post_id: int, db: Session = Depends(get_db)):
+def api_recreate_from_competitor(post_id: int, db: Session = Depends(get_db)):
     """Generate an AI-written original post inspired by a competitor's viral post."""
     source = db.query(CompetitorPost).get(post_id)
     if not source:
@@ -1949,61 +1926,30 @@ class ProfileUrlUpdate(BaseModel):
 
 
 @router.post("/api/profile/set-url")
-async def api_set_profile_url(body: ProfileUrlUpdate):
-    """Save the user's LinkedIn profile URL to .env file."""
+def api_set_profile_url(body: ProfileUrlUpdate, db: Session = Depends(get_db)):
+    """Save the user's LinkedIn profile URL (stored in the app DB, not .env)."""
     import re
 
-    url = body.linkedin_profile_url.strip()
-    if not url:
-        return JSONResponse({"error": "URL cannot be empty"}, status_code=400)
+    from app_settings import set_value
 
-    # Validate it looks like a LinkedIn URL or username
-    if not re.search(r"linkedin\.com/in/|^[a-zA-Z0-9_-]+$", url):
-        return JSONResponse({"error": "Invalid LinkedIn profile URL"}, status_code=400)
-
-    # Sanitize: strip newlines and control characters to prevent .env injection
-    url = re.sub(r"[\r\n\x00-\x1f]", "", url).strip()
-    if not url:
-        return JSONResponse({"error": "Invalid URL after sanitization"}, status_code=400)
-
-    # Update .env file
-    env_path = ".env"
-    try:
-        with open(env_path, "r") as f:
-            lines = f.readlines()
-
-        found = False
-        for i, line in enumerate(lines):
-            if line.startswith("LINKEDIN_PROFILE_URL="):
-                lines[i] = f"LINKEDIN_PROFILE_URL={url}\n"
-                found = True
-                break
-
-        if not found:
-            lines.append(f"\n# My LinkedIn Profile\nLINKEDIN_PROFILE_URL={url}\n")
-
-        with open(env_path, "w") as f:
-            f.writelines(lines)
-
-        # Update runtime setting
-        settings.LINKEDIN_PROFILE_URL = url
-
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).error("Failed to save profile URL: %s", e)
-        return JSONResponse({"error": "Failed to save profile URL"}, status_code=500)
-
+    url = re.sub(r"[\x00-\x1f]", "", body.linkedin_profile_url).strip()
+    if not re.fullmatch(r"(https?://(www\.)?linkedin\.com/in/[A-Za-z0-9_%-]+/?|[A-Za-z0-9_-]{3,100})", url):
+        return JSONResponse(
+            {"error": "Enter a LinkedIn profile URL like https://www.linkedin.com/in/yourname"},
+            status_code=400,
+        )
+    set_value(db, "LINKEDIN_PROFILE_URL", url)
     return {"status": "saved", "url": url}
 
 
 @router.get("/api/profile/url")
-async def api_get_profile_url():
+def api_get_profile_url():
     """Get the currently configured LinkedIn profile URL."""
     return {"url": settings.LINKEDIN_PROFILE_URL}
 
 
 @router.post("/api/profile/scrape")
-async def api_scrape_my_profile(db: Session = Depends(get_db)):
+def api_scrape_my_profile(db: Session = Depends(get_db)):
     """Trigger a scrape of the user's own LinkedIn profile and posts via Apify."""
     from research.profile_scraper import ProfileScraper
 
@@ -2017,7 +1963,7 @@ async def api_scrape_my_profile(db: Session = Depends(get_db)):
 
 
 @router.get("/api/profile/stats")
-async def api_profile_stats(db: Session = Depends(get_db)):
+def api_profile_stats(db: Session = Depends(get_db)):
     """Get aggregate stats for the user's scraped LinkedIn posts."""
     from research.profile_scraper import ProfileScraper
 
@@ -2026,7 +1972,7 @@ async def api_profile_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/api/profile/posts")
-async def api_profile_posts(
+def api_profile_posts(
     sort: str = "engagement",
     limit: int = 10,
     offset: int = 0,
@@ -2055,7 +2001,7 @@ async def api_profile_posts(
             "content": p.content,
             "post_url": p.post_url,
             "linkedin_post_id": p.linkedin_post_id,
-            "post_date": p.post_date.isoformat() if p.post_date else None,
+            "post_date": to_iso(p.post_date),
             "likes": p.likes,
             "comments": p.comments,
             "shares": p.shares,
@@ -2075,7 +2021,7 @@ async def api_profile_posts(
 
 
 @router.get("/api/profile/timeline")
-async def api_profile_timeline(db: Session = Depends(get_db)):
+def api_profile_timeline(db: Session = Depends(get_db)):
     """Get chronological posting data for timeline chart."""
     from collections import defaultdict
     from database.models import MyLinkedInPost
@@ -2111,7 +2057,7 @@ async def api_profile_timeline(db: Session = Depends(get_db)):
 
 
 @router.get("/api/research/items")
-async def api_get_research_items(
+def api_get_research_items(
     source: str | None = None,
     region: str | None = None,
     category: str | None = None,
@@ -2184,7 +2130,7 @@ async def api_get_research_items(
 
 
 @router.get("/api/research/sources")
-async def api_get_research_sources(db: Session = Depends(get_db)):
+def api_get_research_sources(db: Session = Depends(get_db)):
     """Get distinct research sources and their counts."""
     rows = (
         db.query(
@@ -2199,7 +2145,7 @@ async def api_get_research_sources(db: Session = Depends(get_db)):
 
 
 @router.get("/api/research/regions")
-async def api_get_research_regions(db: Session = Depends(get_db)):
+def api_get_research_regions(db: Session = Depends(get_db)):
     """Get distinct regions and their counts."""
     rows = (
         db.query(
@@ -2214,7 +2160,7 @@ async def api_get_research_regions(db: Session = Depends(get_db)):
 
 
 @router.get("/api/research/categories")
-async def api_get_research_categories(db: Session = Depends(get_db)):
+def api_get_research_categories(db: Session = Depends(get_db)):
     """Get distinct categories and their counts."""
     rows = (
         db.query(
@@ -2229,7 +2175,7 @@ async def api_get_research_categories(db: Session = Depends(get_db)):
 
 
 @router.get("/api/research/stats")
-async def api_get_research_stats(db: Session = Depends(get_db)):
+def api_get_research_stats(db: Session = Depends(get_db)):
     """Get research overview stats."""
     # Single query for counts and avg relevance
     stats_row = db.query(
@@ -2292,7 +2238,7 @@ async def api_get_research_stats(db: Session = Depends(get_db)):
 
 
 @router.get("/api/research/topic-map")
-async def api_research_topic_map(db: Session = Depends(get_db)):
+def api_research_topic_map(db: Session = Depends(get_db)):
     """Build a topic map: nodes (topics) and edges (shared categories/sources)."""
     items = (
         db.query(ResearchItem)
@@ -2348,7 +2294,7 @@ async def api_research_topic_map(db: Session = Depends(get_db)):
 
 
 @router.post("/api/research/items/{item_id}/save")
-async def api_toggle_save_research(item_id: int, db: Session = Depends(get_db)):
+def api_toggle_save_research(item_id: int, db: Session = Depends(get_db)):
     """Toggle the saved/bookmarked status of a research item."""
     item = db.query(ResearchItem).get(item_id)
     if not item:
@@ -2359,7 +2305,7 @@ async def api_toggle_save_research(item_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/api/research/items/{item_id}/use")
-async def api_mark_used(item_id: int, db: Session = Depends(get_db)):
+def api_mark_used(item_id: int, db: Session = Depends(get_db)):
     """Mark a research item as used (already generated content from it)."""
     item = db.query(ResearchItem).get(item_id)
     if not item:
@@ -2370,7 +2316,7 @@ async def api_mark_used(item_id: int, db: Session = Depends(get_db)):
 
 
 @router.delete("/api/research/items/{item_id}")
-async def api_delete_research_item(item_id: int, db: Session = Depends(get_db)):
+def api_delete_research_item(item_id: int, db: Session = Depends(get_db)):
     """Delete a specific research item."""
     item = db.query(ResearchItem).get(item_id)
     if not item:
@@ -2381,7 +2327,7 @@ async def api_delete_research_item(item_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/api/research/clear-old")
-async def api_clear_old_research(days: int = 30, db: Session = Depends(get_db)):
+def api_clear_old_research(days: int = 30, db: Session = Depends(get_db)):
     """Delete research items older than specified days (keeps saved ones)."""
     cutoff = datetime.utcnow() - timedelta(days=days)
     deleted = (
@@ -2400,7 +2346,7 @@ async def api_clear_old_research(days: int = 30, db: Session = Depends(get_db)):
 
 
 @router.post("/api/research/batch/save")
-async def api_batch_save_research(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
+def api_batch_save_research(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
     """Batch save/bookmark multiple research items."""
     items = db.query(ResearchItem).filter(ResearchItem.id.in_(body.item_ids)).all()
     for item in items:
@@ -2410,7 +2356,7 @@ async def api_batch_save_research(body: ResearchBulkActionRequest, db: Session =
 
 
 @router.post("/api/research/batch/mark-used")
-async def api_batch_mark_used(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
+def api_batch_mark_used(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
     """Batch mark multiple research items as used."""
     items = db.query(ResearchItem).filter(ResearchItem.id.in_(body.item_ids)).all()
     for item in items:
@@ -2420,7 +2366,7 @@ async def api_batch_mark_used(body: ResearchBulkActionRequest, db: Session = Dep
 
 
 @router.post("/api/research/batch/delete")
-async def api_batch_delete_research(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
+def api_batch_delete_research(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
     """Batch delete multiple research items."""
     deleted = (
         db.query(ResearchItem)
@@ -2432,7 +2378,7 @@ async def api_batch_delete_research(body: ResearchBulkActionRequest, db: Session
 
 
 @router.post("/api/research/batch/create-posts")
-async def api_batch_create_posts(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
+def api_batch_create_posts(body: ResearchBulkActionRequest, db: Session = Depends(get_db)):
     """Batch create LinkedIn posts from multiple research items."""
     results = []
     for item_id in body.item_ids:
@@ -2465,7 +2411,7 @@ async def api_batch_create_posts(body: ResearchBulkActionRequest, db: Session = 
 
 
 @router.post("/api/research/items")
-async def api_create_manual_research(body: ManualResearchItemCreate, db: Session = Depends(get_db)):
+def api_create_manual_research(body: ManualResearchItemCreate, db: Session = Depends(get_db)):
     """Create a manual research item."""
     item = ResearchItem(
         source="manual",
@@ -2486,7 +2432,7 @@ async def api_create_manual_research(body: ManualResearchItemCreate, db: Session
 
 
 @router.put("/api/research/items/{item_id}/notes")
-async def api_update_research_notes(item_id: int, body: UpdateNotesRequest, db: Session = Depends(get_db)):
+def api_update_research_notes(item_id: int, body: UpdateNotesRequest, db: Session = Depends(get_db)):
     """Update notes/annotations on a research item."""
     item = db.query(ResearchItem).get(item_id)
     if not item:
@@ -2500,7 +2446,7 @@ async def api_update_research_notes(item_id: int, body: UpdateNotesRequest, db: 
 
 
 @router.get("/api/research/performance")
-async def api_research_performance_stats(db: Session = Depends(get_db)):
+def api_research_performance_stats(db: Session = Depends(get_db)):
     """Compare engagement of research-based posts vs. non-research posts."""
     # Research-based posts (have research_item_id)
     research_posts = (
@@ -2563,7 +2509,7 @@ async def api_research_performance_stats(db: Session = Depends(get_db)):
 
 
 @router.post("/api/research/items/{item_id}/create-post")
-async def api_create_post_from_research(item_id: int, db: Session = Depends(get_db)):
+def api_create_post_from_research(item_id: int, db: Session = Depends(get_db)):
     """Generate a LinkedIn news summary post from a research item.
 
     Uses the news summary prompt — bullet-point format, no personal angle.
@@ -2573,14 +2519,12 @@ async def api_create_post_from_research(item_id: int, db: Session = Depends(get_
     if not item:
         return JSONResponse({"error": "Research item not found"}, status_code=404)
 
-    import json as json_mod
-    from config import get_anthropic_client
-    from content.prompt_builder import build_news_summary_prompt
-    from content.post_formatter import format_for_linkedin
-    from content.virality_scorer import ViralityScorer
+    import llm
+    from content.pipeline import create_queued_post
+    from content.prompt_builder import WRITING_RULES, build_news_summary_prompt
 
     prompt = build_news_summary_prompt(
-        topic=item.topic or "e-commerce insights",
+        topic=item.topic or "industry news",
         title=item.title or "",
         content=item.content or "",
         source=item.source or "",
@@ -2588,50 +2532,21 @@ async def api_create_post_from_research(item_id: int, db: Session = Depends(get_
     )
 
     try:
-        client = get_anthropic_client()
-        message = client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=settings.CLAUDE_MAX_TOKENS,
-            temperature=settings.CLAUDE_TEMPERATURE,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        content = message.content[0].text.strip()
-    except Exception as e:
-        return JSONResponse({"error": f"Generation failed: {e}"}, status_code=500)
+        content = llm.complete("news_post", prompt, packs=("post",), instructions=WRITING_RULES).text
+    except llm.LLMError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
 
-    content = format_for_linkedin(content, item.topic or "")
-
-    # Score virality
-    scorer = ViralityScorer()
-    score_result = scorer.score(content, item.topic or "")
-
-    # Build research context for reference
     research_context = (
-        f"RESEARCH SOURCE: {item.source}\n"
-        f"TOPIC: {item.topic}\n"
-        f"TITLE: {item.title}\n"
-        f"CONTENT: {item.content}\n"
+        f"RESEARCH SOURCE: {item.source}\nTOPIC: {item.topic}\nTITLE: {item.title}\nCONTENT: {item.content}\n"
+        + (f"URL: {item.url}\n" if item.url else "")
     )
-    if item.url:
-        research_context += f"URL: {item.url}\n"
-
-    post = QueuedPost(
-        content=content,
-        topic=item.topic or item.title,
-        status=PostStatus.QUEUED,
-        research_context=research_context,
-        research_item_id=item.id,
-        virality_score=score_result.get("total_score"),
-        virality_breakdown=json_mod.dumps(score_result),
-        virality_performance=score_result.get("predicted_performance"),
-        word_count=len(content.split()),
+    post = create_queued_post(
+        db, content, topic=item.topic or item.title or "", source="research", template_name="News summary",
+        research_context=research_context, research_item_id=item.id,
     )
-    db.add(post)
-    db.commit()
-
-    # Mark research item as used
-    item.used = True
-    db.commit()
+    if item.url and not post.first_comment:
+        post.first_comment = f"Source: {item.url}"  # links belong in the first comment
+        db.commit()
 
     return {
         "status": "created",
@@ -2644,7 +2559,7 @@ async def api_create_post_from_research(item_id: int, db: Session = Depends(get_
 
 
 @router.post("/api/queue/{post_id}/score-virality")
-async def api_score_virality(post_id: int, db: Session = Depends(get_db)):
+def api_score_virality(post_id: int, db: Session = Depends(get_db)):
     """Score or re-score a post's virality."""
     import json as json_mod
     from content.virality_scorer import ViralityScorer
@@ -2674,7 +2589,7 @@ async def api_score_virality(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/api/idea/generate")
-async def api_generate_from_idea(body: IdeaRequest, db: Session = Depends(get_db)):
+def api_generate_from_idea(body: IdeaRequest, db: Session = Depends(get_db)):
     """Generate multiple post variations from a freeform idea."""
     if not body.idea.strip():
         return JSONResponse({"error": "Please enter your post idea"}, status_code=400)
@@ -2712,15 +2627,18 @@ async def api_generate_from_idea(body: IdeaRequest, db: Session = Depends(get_db
 
 
 @router.post("/api/idea/suggest-topic")
-async def api_suggest_topic(db: Session = Depends(get_db)):
-    """Suggest a trending topic for post creation using Claude."""
-    from config import get_anthropic_client
+def api_suggest_topic(db: Session = Depends(get_db)):
+    """Suggest one post idea, rotating through the user's content pillars."""
     import random as _random
 
-    client = get_anthropic_client()
+    import llm
+    from content.brand import get_pillars
 
-    # Rotate through content pillars so we don't always get the same category
-    categories = [
+    # Prefer the user's own pillars from the brand profile
+    pillars = get_pillars()
+
+    # Fallback categories when no pillars are filled in yet
+    categories = pillars or [
         "AI tools replacing or augmenting agency/marketing work (with specific tool names and results)",
         "Client case study with real dollar amounts (CRO, Klaviyo, Meta Ads, or Shopify optimization)",
         "Behind-the-scenes founder life — running an agency in Toronto, honest day-in-the-life",
@@ -2739,56 +2657,37 @@ async def api_suggest_topic(db: Session = Depends(get_db)):
     ]
     selected_category = _random.choice(categories)
 
-    # Hook styles proven to drive engagement
+    # Hook styles backed by the 2026 reach data (number-first and story openers lead)
     hook_styles = [
-        "bold statement with a specific number (e.g., 'We turned $40K/mo into $180K/mo for a skincare brand.')",
-        "personal / behind-the-scenes (e.g., 'I almost closed my company in year 3.')",
-        "story opening with tension (e.g., 'A client called me at 11pm last Tuesday. Their ROAS had dropped to 0.6x.')",
-        "contrarian with proof (e.g., 'Stop split-testing your landing pages. Here's what to do instead.')",
-        "curiosity gap (e.g., 'The #1 reason supplement brands plateau at $500K/mo isn't what you think.')",
-        "data-led (e.g., 'We analyzed 200 CTAs across 15 Shopify stores. The winner surprised everyone.')",
+        "a statement led by a specific number with context",
+        "a behind-the-scenes moment with a date or place",
+        "a story that opens at a moment of tension",
+        "a contrarian claim backed by one concrete example",
+        "a before/after comparison with one variable changed",
     ]
     selected_hook = _random.choice(hook_styles)
 
-    # Load soul.md for brand context
-    from pathlib import Path as _Path
-    _soul_path = _Path(__file__).resolve().parent.parent / "soul" / "soul.md"
-    _soul_ctx = _soul_path.read_text(encoding="utf-8") if _soul_path.exists() else "No soul.md found"
+    prompt = f"""Suggest ONE specific LinkedIn post idea for the author in the brand profile.
 
-    prompt = f"""You are a LinkedIn content strategist. Use the brand profile below to stay in character.
-
-BRAND PROFILE:
-{_soul_ctx}
-
-Suggest ONE specific LinkedIn post idea for this category:
 CATEGORY: {selected_category}
-
-Use this hook style: {selected_hook}
+HOOK STYLE: {selected_hook}
 
 Requirements:
-- Include at least one specific number, dollar amount, or timeframe
-- Write from the agency owner perspective (say "our client" or "a brand we work with")
-- Make it feel like a real insight from real experience, not generic advice
-- Do NOT suggest anything about Black Friday, Cyber Monday, or holiday sales unless it's currently November
-- Focus on evergreen or currently relevant topics
+- Concrete enough to write today; mention the kind of specific number, example or timeframe the post should use.
+- Only reference experiences the brand profile supports; otherwise frame it as an observation or lesson.
+- Evergreen or currently relevant (no holiday topics unless it is November or December).
 
-Return ONLY the topic idea in 1-2 sentences. No explanations, no options, just one great idea."""
+Return only the idea in 1-2 sentences."""
 
     try:
-        message = client.messages.create(
-            model=settings.CLAUDE_MODEL,
-            max_tokens=200,
-            temperature=0.95,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        topic = message.content[0].text.strip()
+        topic = llm.complete("suggest_topic", prompt, effort="low", max_tokens=2000).text
         return {"topic": topic}
-    except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
+    except llm.LLMError as e:
+        return JSONResponse({"error": str(e)}, status_code=502)
 
 
 @router.get("/api/idea/topic-library")
-async def api_topic_library():
+def api_topic_library():
     """Return a curated library of topic ideas organized by category."""
     library = [
         {
@@ -2928,7 +2827,7 @@ async def api_topic_library():
 # ── Learning System API ─────────────────────────────────────
 
 @router.get("/api/learnings")
-async def api_get_learnings(db: Session = Depends(get_db)):
+def api_get_learnings(db: Session = Depends(get_db)):
     """Return all active learning insights."""
     from database.models import LearningInsight
     insights = (
@@ -2947,8 +2846,8 @@ async def api_get_learnings(db: Session = Depends(get_db)):
             "confidence": round(i.confidence, 2),
             "sample_size": i.sample_size,
             "times_used": i.times_used_in_prompts or 0,
-            "created_at": i.created_at.isoformat() if i.created_at else None,
-            "updated_at": i.updated_at.isoformat() if i.updated_at else None,
+            "created_at": to_iso(i.created_at),
+            "updated_at": to_iso(i.updated_at),
             "is_active": i.is_active,
         }
         for i in insights
@@ -2956,7 +2855,7 @@ async def api_get_learnings(db: Session = Depends(get_db)):
 
 
 @router.get("/api/learnings/all")
-async def api_get_all_learnings(db: Session = Depends(get_db)):
+def api_get_all_learnings(db: Session = Depends(get_db)):
     """Return all insights including deactivated ones."""
     from database.models import LearningInsight
     insights = (
@@ -2975,7 +2874,7 @@ async def api_get_all_learnings(db: Session = Depends(get_db)):
             "confidence": round(i.confidence, 2),
             "sample_size": i.sample_size,
             "times_used": i.times_used_in_prompts or 0,
-            "created_at": i.created_at.isoformat() if i.created_at else None,
+            "created_at": to_iso(i.created_at),
             "is_active": i.is_active,
         }
         for i in insights
@@ -2983,7 +2882,7 @@ async def api_get_all_learnings(db: Session = Depends(get_db)):
 
 
 @router.post("/api/learnings/analyze")
-async def api_run_analysis(db: Session = Depends(get_db)):
+def api_run_analysis(db: Session = Depends(get_db)):
     """Trigger a full pattern analysis cycle."""
     from analytics.pattern_analyzer import PatternAnalyzer
     analyzer = PatternAnalyzer(db)
@@ -2992,7 +2891,7 @@ async def api_run_analysis(db: Session = Depends(get_db)):
 
 
 @router.post("/api/learnings/{insight_id}/deactivate")
-async def api_deactivate_insight(insight_id: int, db: Session = Depends(get_db)):
+def api_deactivate_insight(insight_id: int, db: Session = Depends(get_db)):
     """Manually deactivate an insight."""
     from database.models import LearningInsight
     insight = db.query(LearningInsight).filter(LearningInsight.id == insight_id).first()
@@ -3004,7 +2903,7 @@ async def api_deactivate_insight(insight_id: int, db: Session = Depends(get_db))
 
 
 @router.post("/api/learnings/{insight_id}/activate")
-async def api_activate_insight(insight_id: int, db: Session = Depends(get_db)):
+def api_activate_insight(insight_id: int, db: Session = Depends(get_db)):
     """Re-activate a deactivated insight."""
     from database.models import LearningInsight
     insight = db.query(LearningInsight).filter(LearningInsight.id == insight_id).first()
@@ -3016,7 +2915,7 @@ async def api_activate_insight(insight_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/learnings/history")
-async def api_analysis_history(db: Session = Depends(get_db)):
+def api_analysis_history(db: Session = Depends(get_db)):
     """Return analysis run history."""
     from database.models import AnalysisRun
     runs = db.query(AnalysisRun).order_by(AnalysisRun.created_at.desc()).limit(20).all()
@@ -3029,7 +2928,7 @@ async def api_analysis_history(db: Session = Depends(get_db)):
             "insights_updated": r.insights_updated,
             "insights_superseded": r.insights_superseded,
             "duration_seconds": r.run_duration_seconds,
-            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "created_at": to_iso(r.created_at),
         }
         for r in runs
     ]
@@ -3039,17 +2938,12 @@ async def api_analysis_history(db: Session = Depends(get_db)):
 
 
 @router.get("/experiments", response_class=HTMLResponse)
-async def experiments_page(request: Request, db: Session = Depends(get_db)):
-    tm = TokenManager(db)
-    auth_status = tm.get_token_status()
-    return templates.TemplateResponse(
-        "experiments.html",
-        {"request": request, "auth_status": auth_status, "page": "experiments"},
-    )
+def experiments_page(request: Request, db: Session = Depends(get_db)):
+    return render(request, "experiments.html", "experiments", db)
 
 
 @router.get("/api/experiments")
-async def api_list_experiments(db: Session = Depends(get_db)):
+def api_list_experiments(db: Session = Depends(get_db)):
     """List all experiments with their variations."""
     from database.models import Experiment, ExperimentVariation
     experiments = (
@@ -3078,7 +2972,7 @@ async def api_list_experiments(db: Session = Depends(get_db)):
             "queued_post_id": exp.queued_post_id,
             "actual_engagement": exp.actual_engagement_score,
             "calibration_delta": exp.calibration_delta,
-            "created_at": exp.created_at.isoformat() if exp.created_at else None,
+            "created_at": to_iso(exp.created_at),
             "variations": [
                 {
                     "id": v.id,
@@ -3099,7 +2993,7 @@ async def api_list_experiments(db: Session = Depends(get_db)):
 
 
 @router.get("/api/experiments/summary")
-async def api_experiments_summary(db: Session = Depends(get_db)):
+def api_experiments_summary(db: Session = Depends(get_db)):
     """Get experiment summary with win rates."""
     from autoresearch.log import ExperimentLog
     log = ExperimentLog(db)
@@ -3110,10 +3004,13 @@ async def api_experiments_summary(db: Session = Depends(get_db)):
 
 
 @router.post("/api/autoresearch/run")
-async def api_run_autoresearch(db: Session = Depends(get_db)):
+def api_run_autoresearch(db: Session = Depends(get_db)):
     """Manually trigger an autoresearch experiment cycle."""
     from autoresearch.runner import ExperimentRunner
     runner = ExperimentRunner(db)
+    reason = runner.blocked_reason()
+    if reason:
+        return JSONResponse({"error": reason}, status_code=400)
     results = runner.run_experiment_cycle()
     return {
         "experiments_run": len(results),
@@ -3125,7 +3022,7 @@ async def api_run_autoresearch(db: Session = Depends(get_db)):
 
 
 @router.get("/api/commenting/targets")
-async def api_commenting_targets(db: Session = Depends(get_db)):
+def api_commenting_targets(db: Session = Depends(get_db)):
     """Get today's commenting targets — high-engagement competitor posts."""
     from engagement.comment_helper import CommentHelper
     helper = CommentHelper(db)
@@ -3136,7 +3033,7 @@ async def api_commenting_targets(db: Session = Depends(get_db)):
 
 
 @router.post("/api/commenting/{post_id}/draft")
-async def api_draft_comment(post_id: int, db: Session = Depends(get_db)):
+def api_draft_comment(post_id: int, db: Session = Depends(get_db)):
     """Generate a comment draft for a competitor post."""
     from engagement.comment_helper import CommentHelper
     helper = CommentHelper(db)
@@ -3147,7 +3044,7 @@ async def api_draft_comment(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/api/commenting/{post_id}/done")
-async def api_mark_commented(post_id: int, db: Session = Depends(get_db)):
+def api_mark_commented(post_id: int, db: Session = Depends(get_db)):
     """Mark a competitor post as commented on."""
     from engagement.comment_helper import CommentHelper
     helper = CommentHelper(db)
@@ -3160,7 +3057,7 @@ async def api_mark_commented(post_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/hooks")
-async def api_get_hooks(db: Session = Depends(get_db)):
+def api_get_hooks(db: Session = Depends(get_db)):
     """Get all hooks in the library."""
     from database.models import HookEntry
     hooks = db.query(HookEntry).order_by(HookEntry.engagement_score.desc()).all()
@@ -3174,8 +3071,8 @@ async def api_get_hooks(db: Session = Depends(get_db)):
                 "engagement_score": h.engagement_score,
                 "topic_category": h.topic_category,
                 "times_used": h.times_used or 0,
-                "last_used_at": h.last_used_at.isoformat() if h.last_used_at else None,
-                "created_at": h.created_at.isoformat() if h.created_at else None,
+                "last_used_at": to_iso(h.last_used_at),
+                "created_at": to_iso(h.created_at),
             }
             for h in hooks
         ],
@@ -3184,7 +3081,7 @@ async def api_get_hooks(db: Session = Depends(get_db)):
 
 
 @router.post("/api/hooks/extract")
-async def api_extract_hooks(db: Session = Depends(get_db)):
+def api_extract_hooks(db: Session = Depends(get_db)):
     """Manually trigger hook extraction from top posts."""
     from content.hook_library import HookLibrary
     lib = HookLibrary(db)
@@ -3193,7 +3090,7 @@ async def api_extract_hooks(db: Session = Depends(get_db)):
 
 
 @router.post("/api/hooks/add")
-async def api_add_hook(body: dict, db: Session = Depends(get_db)):
+def api_add_hook(body: dict, db: Session = Depends(get_db)):
     """Manually add a hook to the library."""
     from content.hook_library import HookLibrary
     lib = HookLibrary(db)
@@ -3209,7 +3106,7 @@ async def api_add_hook(body: dict, db: Session = Depends(get_db)):
 
 
 @router.delete("/api/hooks/{hook_id}")
-async def api_delete_hook(hook_id: int, db: Session = Depends(get_db)):
+def api_delete_hook(hook_id: int, db: Session = Depends(get_db)):
     """Delete a hook from the library."""
     from database.models import HookEntry
     hook = db.query(HookEntry).filter(HookEntry.id == hook_id).first()
@@ -3224,7 +3121,7 @@ async def api_delete_hook(hook_id: int, db: Session = Depends(get_db)):
 
 
 @router.get("/api/recycling/candidates")
-async def api_recycling_candidates(db: Session = Depends(get_db)):
+def api_recycling_candidates(db: Session = Depends(get_db)):
     """Get posts eligible for content recycling."""
     from content.recycler import ContentRecycler
     recycler = ContentRecycler(db)
@@ -3233,7 +3130,7 @@ async def api_recycling_candidates(db: Session = Depends(get_db)):
 
 
 @router.post("/api/recycling/{post_id}/recycle")
-async def api_recycle_post(post_id: int, db: Session = Depends(get_db)):
+def api_recycle_post(post_id: int, db: Session = Depends(get_db)):
     """Recycle a top-performing post into a fresh version."""
     from content.recycler import ContentRecycler
     recycler = ContentRecycler(db)

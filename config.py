@@ -1,19 +1,25 @@
 """Application configuration loaded from environment variables."""
 
+import secrets
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    # Claude API
+    # Claude API (all calls go through llm.py)
     ANTHROPIC_API_KEY: str = ""
-    CLAUDE_MODEL: str = "claude-sonnet-4-20250514"
-    CLAUDE_TEMPERATURE: float = 0.8
-    CLAUDE_MAX_TOKENS: int = 1500
+    CLAUDE_MODEL: str = "claude-opus-5"
+    CLAUDE_REFUSAL_FALLBACKS: bool = True  # server-side fallbacks (Claude API only)
 
     # LinkedIn OAuth
     LINKEDIN_CLIENT_ID: str = ""
     LINKEDIN_CLIENT_SECRET: str = ""
     LINKEDIN_REDIRECT_URI: str = "http://localhost:8000/auth/callback"
+    # r_member_social is restricted (Community Management API). Add it here only
+    # if LinkedIn approved your app for it — otherwise authorization fails.
+    LINKEDIN_SCOPES: str = "openid profile w_member_social"
+    LINKEDIN_API_VERSION: str = "202601"
 
     # Reddit (optional)
     REDDIT_CLIENT_ID: str = ""
@@ -24,7 +30,9 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///database/linkedin_posts.db"
 
     # Scheduling
-    POSTS_PER_DAY: int = 4
+    SCHEDULER_ENABLED: bool = True
+    POSTS_PER_DAY: int = 1  # hard cap on publishes per local day (all paths)
+    MIN_HOURS_BETWEEN_POSTS: float = 3.0  # minimum gap between automatic publishes
     RESEARCH_INTERVAL_HOURS: int = 6
     GENERATION_INTERVAL_HOURS: int = 4
     MIN_QUEUE_SIZE: int = 10
@@ -38,6 +46,10 @@ class Settings(BaseSettings):
     # Gemini (Nano Banana) Image Generation
     GEMINI_API_KEY: str = ""
     GEMINI_MODEL: str = "gemini-2.5-flash-image"
+    # kie.ai image generation (used instead of Gemini when KIE_API_KEY is set)
+    KIE_API_KEY: str = ""
+    KIE_IMAGE_MODEL: str = "google/nano-banana"
+    KIE_IMAGE_ASPECT: str = "4:5"  # LinkedIn feed images work best at 1:1 or 4:5
     IMAGE_AUTO_GENERATE: bool = False
 
     # Video / GIF Generation
@@ -47,12 +59,16 @@ class Settings(BaseSettings):
     GIF_FPS: int = 10
     VIDEO_STORAGE_DIR: str = "dashboard/static/videos/generated"
 
-    # Screen Recording
-    SCREEN_RECORD_ENABLED: bool = True
+    # Screen Recording (headless browser visits a URL — off by default)
+    SCREEN_RECORD_ENABLED: bool = False
     PLAYWRIGHT_HEADLESS: bool = True
 
     # Competitor Scraper (Apify LinkedIn Scrapers)
     APIFY_TOKEN: str = ""
+    # Optional Engage helpers (fetch a post's text / its comments). Public actors
+    # change over time, so both IDs can be swapped in .env.
+    APIFY_POST_ACTOR: str = "supreme_coder/linkedin-post"
+    APIFY_COMMENTS_ACTOR: str = "apimaestro/linkedin-post-comments-replies-engagements-scraper-no-cookies"
     COMPETITOR_SCRAPE_HOUR: int = 6  # daily scrape at 6 AM
     COMPETITOR_SCRAPE_ENABLED: bool = True
 
@@ -61,9 +77,9 @@ class Settings(BaseSettings):
     PROFILE_SCRAPE_HOUR: int = 7  # daily scrape at 7 AM
     PROFILE_SCRAPE_ENABLED: bool = True
 
-    # Fact-checking
+    # Fact-checking + quality
     FACT_CHECK_ENABLED: bool = True
-    FACT_CHECK_MODEL: str = "claude-sonnet-4-20250514"
+    AUTO_REPAIR: bool = True  # one "Fix with AI" pass on new drafts that fail the quality check
 
     # Learning System
     LEARNING_ANALYSIS_ENABLED: bool = True
@@ -71,8 +87,10 @@ class Settings(BaseSettings):
     LEARNING_MAX_PROMPT_INSIGHTS: int = 8
     LEARNING_MIN_CONFIDENCE: float = 0.4
 
-    # Autoresearch (Karpathy-style experimentation)
-    AUTORESEARCH_ENABLED: bool = True
+    # Autoresearch (Claude-scored experiments). Off until you have real results:
+    # it also needs AUTORESEARCH_MIN_POSTED published posts before it runs.
+    AUTORESEARCH_ENABLED: bool = False
+    AUTORESEARCH_MIN_POSTED: int = 10
     AUTORESEARCH_VARIATIONS_PER_EXPERIMENT: int = 4
     AUTORESEARCH_MIN_SCORE_TO_QUEUE: int = 65
     AUTORESEARCH_EXPERIMENTS_PER_CYCLE: int = 3
@@ -80,8 +98,6 @@ class Settings(BaseSettings):
 
     # Posting Time Optimization
     POSTING_TIMEZONE: str = "America/Toronto"
-    POSTING_SLOTS: str = "08:00,10:00"
-    POSTING_ACTIVE_DAYS: str = "0,1,2,3,4"  # Mon-Fri
 
     # Content Strategy
     TEXT_ONLY_DEFAULT: bool = True
@@ -90,28 +106,36 @@ class Settings(BaseSettings):
     HOOK_LIBRARY_ENABLED: bool = True
 
     # Content Recycling
-    CONTENT_RECYCLING_ENABLED: bool = True
     RECYCLING_MIN_AGE_DAYS: int = 60
     RECYCLING_MIN_ENGAGEMENT: int = 50
 
-    # Dashboard
-    HOST: str = "0.0.0.0"
-    PORT: int = 8082
+    # Engagement (comments / replies published via the LinkedIn API)
+    ENGAGE_DAILY_CAP: int = 30
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    # Dashboard
+    HOST: str = "127.0.0.1"
+    PORT: int = 8000
+    RELOAD: bool = False
+    DASHBOARD_PASSWORD: str = ""  # required when HOST is not a loopback address
+    SECRET_KEY: str = ""  # session signing key; generated on first run if empty
+
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
 
 settings = Settings()
 
-
-# ── Shared Anthropic client singleton ──────────────────────────
-_anthropic_client = None
+LOOPBACK_HOSTS = {"127.0.0.1", "localhost", "::1"}
 
 
-def get_anthropic_client():
-    """Return a shared Anthropic client instance (lazy-initialized)."""
-    global _anthropic_client
-    if _anthropic_client is None:
-        import anthropic
-        _anthropic_client = anthropic.Anthropic(api_key=settings.ANTHROPIC_API_KEY)
-    return _anthropic_client
+def get_secret_key() -> str:
+    """Return SECRET_KEY, generating and persisting one on first run."""
+    if settings.SECRET_KEY:
+        return settings.SECRET_KEY
+    key_file = Path("database/.secret_key")
+    if key_file.exists():
+        return key_file.read_text().strip()
+    key_file.parent.mkdir(parents=True, exist_ok=True)
+    key = secrets.token_urlsafe(48)
+    key_file.write_text(key)
+    key_file.chmod(0o600)
+    return key

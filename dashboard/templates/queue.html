@@ -93,7 +93,7 @@
 
 <!-- Edit modal -->
 <div id="edit-modal" class="fixed inset-0 bg-black/40 backdrop-blur-sm hidden z-50 flex items-center justify-center">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto fade-in">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl mx-4 max-h-[92vh] overflow-y-auto fade-in">
         <div class="p-6">
             <div class="flex items-center justify-between mb-4">
                 <div>
@@ -104,6 +104,8 @@
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
+            <div class="grid gap-6 md:grid-cols-[minmax(0,1fr)_320px]">
+            <div class="min-w-0">
             <!-- Formatting toolbar -->
             <div class="flex items-center gap-1 mb-2 p-1.5 bg-gray-50 rounded-lg border border-gray-200">
                 <button onclick="insertAtCursor('\\n\\n')" class="px-2 py-1 text-xs rounded hover:bg-white hover:shadow-sm text-gray-600 transition" title="Line break">Line Break</button>
@@ -172,6 +174,12 @@
                 <summary class="text-xs text-gray-500 cursor-pointer hover:text-gray-700 font-medium">Preview</summary>
                 <div id="edit-preview" class="mt-2 p-4 bg-gray-50 rounded-xl text-sm leading-relaxed text-gray-700 whitespace-pre-wrap border border-gray-100 max-h-60 overflow-y-auto"></div>
             </details>
+            </div>
+            <aside class="md:sticky md:top-0 self-start">
+                <div class="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-2">Quality check</div>
+                <div id="edit-quality"></div>
+            </aside>
+            </div>
             <div class="flex gap-2 justify-end">
                 <button onclick="closeEditModal()" class="btn btn-ghost btn-md">Cancel</button>
                 <button onclick="saveEdit()" class="btn btn-primary btn-md">Save</button>
@@ -211,11 +219,12 @@ async function loadQueue() {
                         <input type="checkbox" class="post-checkbox w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400" value="${post.id}">
                         <span class="badge badge-info">${escapeHtml(post.template_name || 'Unknown')}</span>
                         ${post.hook_type ? `<span class="badge badge-neutral">${escapeHtml(post.hook_type)}</span>` : ''}
+                        ${App.qualityBadge(post.quality_report, post.quality_score)}
                         ${mediaTypeBadge(post)}
                         ${factCheckBadge(post)}
                         ${viralityBadge(post)}
-                        <span class="text-xs" style="color: var(--text-muted);">${post.word_count}w · ${post.char_count || post.content.length}c · ${post.newline_count || 0} lines</span>
-                        ${(post.newline_count || 0) > 34 ? '<span class="badge badge-danger">Too many lines!</span>' : (post.newline_count || 0) > 28 ? '<span class="badge badge-warning">High line count</span>' : ''}
+                        <span class="text-xs" style="color: var(--text-muted);">${post.word_count ?? post.content.split(/\s+/).filter(Boolean).length}w · ${post.char_count || post.content.length}c · ${post.newline_count ?? (post.content.match(/\n/g) || []).length} lines</span>
+                        ${(post.newline_count || 0) > 25 ? '<span class="badge badge-danger">Too many lines!</span>' : (post.newline_count || 0) > 22 ? '<span class="badge badge-warning">High line count</span>' : ''}
                     </div>
                     ${post.topic ? `<span class="badge badge-neutral">${escapeHtml(post.topic)}</span>` : ''}
                 </div>
@@ -266,6 +275,16 @@ async function loadQueue() {
                 </div>
             </div>
         `).join('');
+
+        // Arriving from Home ("Review" → /queue#post-12): bring that draft into view once
+        const target = location.hash.startsWith('#post-') && document.querySelector(location.hash);
+        if (target && !target.dataset.focused) {
+            target.dataset.focused = '1';
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.style.boxShadow = '0 0 0 2px var(--accent, #0071e3)';
+            setTimeout(() => { target.style.boxShadow = ''; }, 2200);
+            history.replaceState(null, '', location.pathname);
+        }
     } catch (err) {
         document.getElementById('queue-container').innerHTML = `
             <div class="text-center py-16">
@@ -349,8 +368,8 @@ function showViralityDetail(postId) {
         return `<div class="flex items-center gap-2"><span class="text-[11px] text-gray-500 w-28 text-right">${d.label}</span><div style="height:6px;border-radius:3px;background:#e5e7eb;flex:1;overflow:hidden;"><div style="height:100%;border-radius:3px;width:${pct}%;background:${col};"></div></div><span class="text-[11px] font-medium w-10">${val}/${d.max}</span></div>`;
     }).join('');
 
-    const strengths = (bd.strengths || []).map(s => `<li class="text-xs text-green-700">+ ${s}</li>`).join('');
-    const improvements = (bd.improvements || []).map(s => `<li class="text-xs text-amber-700">- ${s}</li>`).join('');
+    const strengths = (bd.strengths || []).map(s => `<li class="text-xs text-green-700">+ ${escapeHtml(s)}</li>`).join('');
+    const improvements = (bd.improvements || []).map(s => `<li class="text-xs text-amber-700">- ${escapeHtml(s)}</li>`).join('');
 
     const modalHtml = `
     <div class="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center" onclick="if(event.target===this)this.remove()" id="virality-modal">
@@ -366,13 +385,29 @@ function showViralityDetail(postId) {
             <div class="space-y-1.5 mb-4">${barsHtml}</div>
             ${strengths ? `<div class="mb-3"><div class="text-xs font-medium text-gray-500 mb-1">Strengths</div><ul class="space-y-0.5">${strengths}</ul></div>` : ''}
             ${improvements ? `<div class="mb-3"><div class="text-xs font-medium text-gray-500 mb-1">Improvements</div><ul class="space-y-0.5">${improvements}</ul></div>` : ''}
-            ${bd.one_line_verdict ? `<div class="text-sm text-gray-600 italic text-center border-t pt-3">${bd.one_line_verdict}</div>` : ''}
+            ${bd.one_line_verdict ? `<div class="text-sm text-gray-600 italic text-center border-t pt-3">${escapeHtml(bd.one_line_verdict)}</div>` : ''}
         </div>
     </div>`;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 }
 
+// Ask before approving a post that still fails the quality check.
+async function confirmIssues(content) {
+    let report;
+    try { report = await App.api('/api/quality/check', { method: 'POST', body: { text: content, kind: 'post' }, quiet: true }); }
+    catch (e) { return true; }
+    const n = (report.blockers || []).length;
+    if (!n) return true;
+    return App.confirm({
+        title: `Approve with ${n} issue${n > 1 ? 's' : ''}?`,
+        message: report.blockers.map(b => '• ' + b.message).join('\n') + '\n\nThese usually cost reach or read as AI. You can fix them in Edit.',
+        confirmText: 'Approve anyway',
+    });
+}
+
 async function approvePost(id) {
+    const post = postsData.find(p => p.id === id);
+    if (post && !(await confirmIssues(post.content))) return;
     const res = await fetch(`/api/queue/${id}/approve`, {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})
     });
@@ -429,8 +464,8 @@ async function postNow(id) {
     const post = postsData.find(p => p.id === id);
     if (post) {
         const newlines = (post.content.match(/\n/g) || []).length;
-        if (newlines > 34) {
-            showToast(`Cannot post — too many line breaks (${newlines}/34 max). Edit the post first to reduce blank lines.`, 'error');
+        if (newlines > 25) {
+            showToast(`Too many line breaks (${newlines}/25). LinkedIn cuts everything after ~25 — edit the post first.`, 'error');
             return;
         }
         if (post.content.length > 3000) {
@@ -438,12 +473,26 @@ async function postNow(id) {
             return;
         }
     }
-    if (!confirm('Post this to LinkedIn right now?')) return;
+    // Publishing is an explicit two-step decision: approve, then publish now.
+    if (!(await App.confirm({
+        title: 'Approve and publish now?',
+        message: 'This post will be approved and go live on your LinkedIn profile immediately. This cannot be undone.',
+        confirmText: 'Publish now',
+    }))) return;
+    const approve = await fetch(`/api/queue/${id}/approve`, {
+        method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({})
+    });
+    if (!approve.ok) {
+        const data = await approve.json().catch(() => ({}));
+        showToast(data.error || 'Could not approve this post', 'error');
+        return;
+    }
     const res = await fetch(`/api/post-now/${id}`, {method: 'POST'});
-    if (res.ok) { showToast('Posted to LinkedIn!'); loadQueue(); }
+    if (res.ok) { showToast('Published to LinkedIn!'); loadQueue(); }
     else {
         const data = await res.json().catch(() => ({}));
-        showToast(data.error || 'Failed to post. Check connection.', 'error');
+        showToast((data.error || 'Failed to post.') + ' The post stays approved.', 'error');
+        loadQueue();
     }
 }
 
@@ -494,6 +543,7 @@ function openEditModal(id) {
     document.getElementById('edit-modal').classList.remove('hidden');
     updateEditStats();
     updatePreview();
+    if (editQuality) editQuality.refresh();
     textarea.focus();
 }
 
@@ -519,11 +569,11 @@ function updateEditStats() {
     if (charCount > 3000) {
         warn.textContent = `${charCount - 3000} over limit!`;
         warn.className = 'text-xs text-red-500 font-medium';
-    } else if (newlineCount > 34) {
-        warn.textContent = `${newlineCount} newlines — will be truncated! (max 34)`;
+    } else if (newlineCount > 25) {
+        warn.textContent = `${newlineCount} newlines — LinkedIn will cut the end (max 25)`;
         warn.className = 'text-xs text-red-500 font-medium';
-    } else if (newlineCount > 28) {
-        warn.textContent = `${newlineCount} newlines — risk of truncation`;
+    } else if (newlineCount > 22) {
+        warn.textContent = `${newlineCount} newlines — close to the 25 limit`;
         warn.className = 'text-xs text-amber-500';
     } else if (charCount > 2700) {
         warn.textContent = `${3000 - charCount} chars remaining`;
@@ -541,6 +591,8 @@ function updatePreview() {
 }
 
 const editTextarea = document.getElementById('edit-textarea');
+// Live quality meter + Auto-fix / Fix with AI next to the editor
+const editQuality = editTextarea ? PostEditor.attach(editTextarea, document.getElementById('edit-quality'), { kind: 'post' }) : null;
 if (editTextarea) {
     editTextarea.addEventListener('input', () => { updateEditStats(); updatePreview(); });
     // Ctrl/Cmd+Enter to save
@@ -728,8 +780,8 @@ async function saveEdit() {
         return;
     }
     const newlines = (content.match(/\n/g) || []).length;
-    if (newlines > 34) {
-        showToast(`Too many line breaks (${newlines}/34 max) — LinkedIn will truncate this post. Remove some blank lines.`, 'error');
+    if (newlines > 25) {
+        showToast(`Too many line breaks (${newlines}/25 max) — LinkedIn will truncate this post. Remove some blank lines.`, 'error');
         return;
     }
     const res = await fetch(`/api/queue/${editingPostId}/edit`, {
@@ -754,10 +806,11 @@ async function saveAndApprove() {
         return;
     }
     const newlines = (content.match(/\n/g) || []).length;
-    if (newlines > 34) {
-        showToast(`Too many line breaks (${newlines}/34 max) — LinkedIn will truncate this post. Remove some blank lines.`, 'error');
+    if (newlines > 25) {
+        showToast(`Too many line breaks (${newlines}/25 max) — LinkedIn will truncate this post. Remove some blank lines.`, 'error');
         return;
     }
+    if (!(await confirmIssues(content))) return;
     const res = await fetch(`/api/queue/${editingPostId}/approve`, {
         method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({edited_content: content})
     });

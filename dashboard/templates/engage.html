@@ -1,0 +1,523 @@
+{% extends "base.html" %}
+
+{% block title %}Engage{% endblock %}
+{% block page_title %}Engage{% endblock %}
+
+{% block head %}
+<style>
+    [data-panel][hidden] { display: none !important; }
+    .opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border-primary); border-radius: 10px; cursor: pointer; }
+    .opt:hover { border-color: var(--text-muted); }
+    .opt.active { border-color: var(--accent); background: var(--accent-light); }
+    .opt input { margin-top: 3px; }
+    .quote { font-size: 13px; color: var(--text-secondary); border-left: 3px solid var(--border-primary); padding: 2px 0 2px 10px; white-space: pre-line; }
+    .item { padding: 14px 16px; border: 1px solid var(--border-primary); border-radius: 12px; background: #fff; }
+    .inline-select { width: auto; padding: 5px 10px; font-size: 12.5px; }
+    .tab-count { display: inline-block; min-width: 18px; padding: 0 6px; margin-left: 4px; border-radius: 9px; background: #f04438; color: #fff; font-size: 11px; line-height: 18px; text-align: center; }
+    .tab-count[hidden] { display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Engage</h1>
+        <p>Comment on posts in your niche and answer comments on yours. Nothing posts until you approve it.</p>
+    </div>
+    <div class="page-actions"><span class="chip" style="cursor: default;" id="cap-chip"></span></div>
+</div>
+
+<div id="banners"></div>
+
+<div class="tabs" role="tablist" style="margin-bottom: 20px;">
+    <button type="button" class="tab active" data-tab="comment" role="tab">Comment on a post</button>
+    <button type="button" class="tab" data-tab="reply" role="tab">Reply to comments</button>
+    <button type="button" class="tab" data-tab="targets" role="tab">Daily targets</button>
+    <button type="button" class="tab" data-tab="activity" role="tab">Activity<span class="tab-count" id="needs-badge" hidden></span></button>
+    <button type="button" class="tab" data-tab="followups" role="tab">Follow-ups</button>
+</div>
+
+<div class="grid-main">
+    <div class="stack">
+        <!-- Comment on a post -->
+        <section class="card card-pad" data-panel="comment">
+            <label class="field-label" for="c-url">Post link</label>
+            <input id="c-url" class="field-input" placeholder="https://www.linkedin.com/posts/…" autocomplete="off">
+            <p class="tiny muted" style="margin-top: 6px;">With the link, the app can post your comment for you. Without it you get Copy + Open.</p>
+            <label class="field-label" for="c-text">Post text</label>
+            <textarea id="c-text" class="field-input" rows="8" placeholder="Paste the post so the comment responds to what it actually says"></textarea>
+            <label class="field-label" for="c-author">Author <span class="muted" style="font-weight: 400;">(optional)</span></label>
+            <input id="c-author" class="field-input" placeholder="Jane Doe" autocomplete="off">
+            <button type="button" class="btn btn-primary btn-md" id="c-go" style="margin-top: 16px;" onclick="draftComment(this)">Draft comments</button>
+        </section>
+
+        <!-- Reply to comments -->
+        <section class="card card-pad" data-panel="reply" hidden>
+            <label class="field-label" for="r-url">Your post's link <span class="muted" style="font-weight: 400;">(optional)</span></label>
+            <input id="r-url" class="field-input" placeholder="https://www.linkedin.com/feed/update/urn:li:activity:…" autocomplete="off">
+            <details style="margin-top: 10px;">
+                <summary class="tiny muted" style="cursor: pointer;">Add your post's text for better replies</summary>
+                <textarea id="r-post" class="field-input" rows="5" style="margin-top: 8px;"></textarea>
+            </details>
+            <label class="field-label" for="r-comments">Comments to answer</label>
+            <textarea id="r-comments" class="field-input" rows="10" placeholder="Copy the comments from your post and paste them here. To let the app post a reply for you, put that comment's link (… → Copy link to comment) on the line above it."></textarea>
+            <div class="row-actions">
+                <button type="button" class="btn btn-primary btn-md" onclick="reviewComments(this)">Review comments</button>
+                {% if status.apify %}<button type="button" class="btn btn-ghost btn-md" onclick="fetchComments(this)">Fetch from LinkedIn</button>{% endif %}
+            </div>
+            <div id="r-review" style="margin-top: 16px;"></div>
+        </section>
+
+        <!-- Daily targets -->
+        <section class="card card-pad" data-panel="targets" hidden>
+            <div class="card-head">
+                <div>
+                    <div class="card-title">Posts worth a comment today</div>
+                    <div class="card-sub">Recent, high-engagement posts from the people you track in Competitors.</div>
+                </div>
+            </div>
+            <div id="t-list" class="stack" style="gap: 10px;"><div class="skeleton" style="height: 90px;"></div></div>
+        </section>
+
+        <!-- Activity -->
+        <section class="card card-pad" data-panel="activity" hidden>
+            <div id="a-list"><div class="skeleton" style="height: 90px;"></div></div>
+        </section>
+
+        <!-- Follow-ups -->
+        <section class="card card-pad" data-panel="followups" hidden>
+            <div class="card-head">
+                <div>
+                    <div class="card-title">Check back on these</div>
+                    <div class="card-sub">Comments you posted 6–48 hours ago. Replies to your comment are where conversations start.</div>
+                </div>
+            </div>
+            <div id="f-list" class="stack" style="gap: 10px;"></div>
+        </section>
+    </div>
+
+    <div class="stack">
+        <div class="card card-pad" data-panel="comment">
+            <div class="card-title">Your comment</div>
+            <div class="card-sub" id="c-sub">Draft options appear here.</div>
+            <div id="c-skip"></div>
+            <div id="c-options" class="stack" style="gap: 8px; margin-top: 12px;"></div>
+            <div id="c-editor" style="margin-top: 12px;" hidden></div>
+            <div id="c-controls"></div>
+        </div>
+
+        <div class="card card-pad" data-panel="reply" hidden>
+            <div class="card-head">
+                <div>
+                    <div class="card-title">Replies</div>
+                    <div class="card-sub" id="rd-sub">Review the comments first.</div>
+                </div>
+                <button type="button" class="btn btn-primary btn-sm" id="approve-all" hidden onclick="approveAll(this)">Approve all</button>
+            </div>
+            <div id="rd-list" class="stack" style="gap: 10px;"></div>
+        </div>
+
+        <div class="card card-pad" data-panel="targets activity followups" hidden>
+            <div class="card-title">How posting works</div>
+            <ul class="tiny muted" style="margin: 10px 0 0 16px; line-height: 1.7; list-style: disc;">
+                <li>Approved comments post one at a time, 1–3 minutes apart, up to {{ status.cap }} a day.</li>
+                <li>The app reacts to the post first, then comments, the way a person would.</li>
+                <li>If LinkedIn won't let the app comment, items switch to Copy + Open post so you can paste them yourself.</li>
+                <li>If LinkedIn doesn't answer, the item is marked "check on LinkedIn" and never retried automatically, so nothing posts twice.</li>
+            </ul>
+            <div id="status-box" class="tiny" style="margin-top: 14px; line-height: 1.8;"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+const REACTIONS = { LIKE: 'Like', PRAISE: 'Celebrate', EMPATHY: 'Love', INTEREST: 'Insightful', APPRECIATION: 'Support', ENTERTAINMENT: 'Funny' };
+let STATUS = {{ status|tojson }};
+const $ = (id) => document.getElementById(id);
+const S = { comment: null, review: null, replies: [], targets: [], byId: {} };
+const loaded = {};
+
+const cEditor = new PostEditor($('c-editor'), { kind: 'comment', text: '', showPreview: false, minHeight: 150, placeholder: 'Your comment…' });
+
+// ── Helpers ─────────────────────────────────────────
+const autoOn = () => STATUS.mode === 'auto' && STATUS.connected;
+const approveLabel = (d) => (d.can_auto && autoOn() ? 'Approve & post' : 'Approve (post it yourself)');
+const keep = (d) => { S.byId[d.id] = d; return d; };
+
+function reactionSelect(id, value) {
+    return `<select id="${id}" class="field-input inline-select" title="Reaction added before your comment">
+        <option value="">No reaction</option>
+        ${Object.entries(REACTIONS).map(([k, v]) => `<option value="${k}" ${k === value ? 'selected' : ''}>${v}</option>`).join('')}
+    </select>`;
+}
+
+function statusBadge(d) {
+    const map = { draft: ['q-none', 'Draft'], approved: ['q-review', 'Scheduled'], publishing: ['q-review', 'Posting…'],
+        published: ['q-ready', 'Posted'], manual: ['q-review', 'Post it yourself'], failed: ['q-fix', 'Failed'],
+        unknown: ['q-fix', 'Check on LinkedIn'], skipped: ['q-none', 'Skipped'] };
+    const [cls, label] = map[d.status] || ['q-none', d.status];
+    return `<span class="q-badge ${cls}"><span class="q-dot"></span>${label}</span>`;
+}
+
+function manualButtons(d) {
+    const copy = d.open_url
+        ? `<button type="button" class="btn btn-primary btn-sm" onclick="copyOpen(${d.id})">Copy & open post</button>`
+        : `<button type="button" class="btn btn-primary btn-sm" onclick="App.copy(S.byId[${d.id}].text)">Copy</button>`;
+    return copy + `<button type="button" class="btn btn-ghost btn-sm" onclick="markDone(${d.id}, this)">I posted it</button>`;
+}
+
+function copyOpen(id) {
+    const d = S.byId[id];
+    App.copy(d.text);
+    window.open(safeUrl(d.open_url), '_blank', 'noopener');
+}
+
+async function confirmQuality(text, kind) {
+    let report;
+    try { report = await App.api('/api/quality/check', { method: 'POST', body: { text, kind }, quiet: true }); }
+    catch (e) { return true; }
+    const n = (report.blockers || []).length;
+    if (!n) return true;
+    return App.confirm({
+        title: `Approve with ${n} issue${n > 1 ? 's' : ''}?`,
+        message: report.blockers.map(b => '• ' + b.message).join('\n'),
+        confirmText: 'Approve anyway',
+    });
+}
+
+function afterApprove(d, container) {
+    keep(d);
+    if (d.status === 'approved') {
+        showToast(STATUS.scheduler ? 'Scheduled. It posts in a minute or two.' : 'Approved. Automation is off, so press Post now in Activity.');
+        container.innerHTML = `<div class="row-actions">${statusBadge(d)}<span class="tiny muted">around ${esc(App.fmtDate(d.publish_after))}</span></div>`;
+    } else if (d.status === 'manual') {
+        container.innerHTML = `${d.error ? `<p class="tiny" style="color: #93370d; margin-top: 10px;">${esc(d.error)}</p>` : ''}<div class="row-actions">${manualButtons(d)}</div>`;
+    }
+    refreshStatus();
+}
+
+// ── Status banners ──────────────────────────────────
+async function refreshStatus() {
+    try { STATUS = await App.api('/api/engage/status', { quiet: true }); } catch (e) { /* keep last */ }
+    renderBanners();
+}
+
+function renderBanners() {
+    const b = [];
+    if (!STATUS.connected) b.push(['warn', "LinkedIn isn't connected, so approved comments become Copy + Open post.", '<a class="btn btn-ghost btn-sm" href="/auth/login">Connect</a>']);
+    if (STATUS.mode === 'manual') b.push(['warn', `LinkedIn didn't allow this app to comment${STATUS.reason ? ' (' + esc(STATUS.reason) + ')' : ''}. Approved comments are Copy + Open post for now.`, '<button type="button" class="btn btn-ghost btn-sm" onclick="tryApiAgain(this)">Try the API again</button>']);
+    if (STATUS.paused_until) b.push(['warn', `LinkedIn asked the app to slow down. Posting resumes around ${esc(App.fmtDate(STATUS.paused_until))}.`, '']);
+    if (!STATUS.scheduler && STATUS.pending) b.push(['info', 'Automation is off, so scheduled comments wait until you press Post now in Activity.', '']);
+    if (STATUS.published_today >= STATUS.cap) b.push(['info', `Daily limit reached (${STATUS.cap}). Scheduled comments continue tomorrow.`, '']);
+    $('banners').innerHTML = b.map(([k, msg, act]) => `<div class="banner ${k}"><span style="flex: 1;">${msg}</span>${act}</div>`).join('');
+    $('cap-chip').textContent = `${STATUS.published_today} / ${STATUS.cap} posted today`;
+    $('needs-badge').hidden = !STATUS.needs_you;
+    $('needs-badge').textContent = STATUS.needs_you || '';
+    $('status-box').innerHTML = `
+        <div>Posting: <b>${STATUS.mode === 'manual' ? 'Copy + Open (API refused)' : STATUS.connected ? 'automatic after approval' : 'Copy + Open (not connected)'}</b></div>
+        <div>Scheduled: <b>${STATUS.pending}</b> · Needs you: <b>${STATUS.needs_you}</b></div>`;
+}
+
+async function tryApiAgain(btn) {
+    App.busy(btn, true, '…');
+    try { STATUS = await App.api('/api/engage/mode/auto', { method: 'POST' }); renderBanners(); showToast('The next approved comment will try the API again'); }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+// ── Tabs ────────────────────────────────────────────
+function showTab(tab) {
+    document.querySelectorAll('.tab[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('[data-panel]').forEach(el => { el.hidden = !el.dataset.panel.split(' ').includes(tab); });
+    history.replaceState(null, '', '#' + tab);
+    if (tab === 'targets' && !loaded.targets) { loaded.targets = true; loadTargets(); }
+    if (tab === 'activity') loadActivity();
+    if (tab === 'followups') loadFollowups();
+}
+document.querySelectorAll('.tab[data-tab]').forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+
+// ── Comment on a post ───────────────────────────────
+async function draftComment(btn, extra = {}) {
+    const post_text = $('c-text').value.trim();
+    const post_url = $('c-url').value.trim();
+    if (!post_text && !(post_url && STATUS.apify)) { showToast('Paste the post text first', 'error'); $('c-text').focus(); return; }
+    App.busy(btn, true, 'Drafting…');
+    try {
+        const r = await App.api('/api/engage/comment/draft', { method: 'POST', body: { post_url, post_text, author: $('c-author').value.trim(), ...extra } });
+        S.comment = keep(r.draft);
+        renderComment(r.skip_reason);
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+function renderComment(skipReason) {
+    const d = S.comment;
+    $('c-sub').textContent = d.target_author ? `On ${d.target_author}'s post. Pick an option, edit it, approve.` : 'Pick an option, edit it, approve.';
+    $('c-skip').innerHTML = skipReason ? `<div class="banner warn" style="margin: 12px 0 0;">Consider skipping this one: ${esc(skipReason)}</div>` : '';
+    $('c-options').innerHTML = d.options.map((o, i) => `
+        <label class="opt ${i === 0 ? 'active' : ''}" data-i="${i}">
+            <input type="radio" name="copt" ${i === 0 ? 'checked' : ''}>
+            <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; justify-content: space-between; gap: 8px; align-items: center;">
+                    <span class="row-title">${esc(o.template ? o.template + ' · ' : '')}${esc(o.template_name)}</span>${App.qualityBadge(o.report)}
+                </div>
+                <div class="tiny muted line-clamp-2" style="margin-top: 4px;">${esc(o.text)}</div>
+            </div>
+        </label>`).join('');
+    $('c-options').querySelectorAll('.opt').forEach(el => el.addEventListener('click', () => {
+        const o = d.options[+el.dataset.i];
+        cEditor.text = o.text;
+        d.template_code = o.template;
+        $('c-options').querySelectorAll('.opt').forEach(x => x.classList.toggle('active', x === el));
+    }));
+    $('c-editor').hidden = false;
+    cEditor.text = d.text;
+    $('c-controls').innerHTML = `<div class="row-actions">${reactionSelect('c-reaction', d.reaction)}
+        <button type="button" class="btn btn-primary btn-sm" onclick="approveComment(this)">${approveLabel(d)}</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="skipDraft(${d.id}, this)">Skip</button></div>`;
+}
+
+async function approveComment(btn) {
+    const d = S.comment;
+    const text = cEditor.text.trim();
+    if (!text) { showToast('Write or pick a comment first', 'error'); return; }
+    if (!(await confirmQuality(text, 'comment'))) return;
+    App.busy(btn, true, 'Approving…');
+    try {
+        const r = await App.api(`/api/engage/${d.id}/approve`, { method: 'POST', body: { text, reaction: $('c-reaction').value, template_code: d.template_code || null } });
+        S.comment = r.draft;
+        afterApprove(r.draft, $('c-controls'));
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+async function skipDraft(id, btn) {
+    App.busy(btn, true, '…');
+    try {
+        await App.api(`/api/engage/${id}/skip`, { method: 'POST' });
+        showToast('Skipped');
+        if (S.comment && S.comment.id === id) { $('c-controls').innerHTML = '<p class="tiny muted" style="margin-top: 10px;">Skipped.</p>'; }
+        const card = $('ra-' + id);
+        if (card) card.innerHTML = statusBadge({ status: 'skipped' });
+        if (document.querySelector('.tab.active').dataset.tab === 'activity') loadActivity();
+        refreshStatus();
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+async function markDone(id, btn) {
+    App.busy(btn, true, '…');
+    try {
+        const r = await App.api(`/api/engage/${id}/done`, { method: 'POST' });
+        keep(r.draft);
+        showToast('Marked as posted');
+        if (btn && btn.closest('.row-actions')) btn.closest('.row-actions').innerHTML = statusBadge(r.draft);
+        if (document.querySelector('.tab.active').dataset.tab === 'activity') loadActivity();
+        refreshStatus();
+    } catch (e) { /* toast shown */ }
+}
+
+// ── Reply to comments ───────────────────────────────
+async function reviewComments(btn) {
+    const comments_text = $('r-comments').value.trim();
+    if (!comments_text) { showToast('Paste some comments first', 'error'); return; }
+    App.busy(btn, true, 'Reading…');
+    try { S.review = await App.api('/api/engage/replies/parse', { method: 'POST', body: { comments_text } }); renderReview(); }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+async function fetchComments(btn) {
+    const post_url = $('r-url').value.trim();
+    if (!post_url) { showToast("Add your post's link first", 'error'); return; }
+    App.busy(btn, true, 'Fetching…');
+    try { S.review = await App.api('/api/engage/replies/fetch', { method: 'POST', body: { post_url } }); renderReview(); }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+function renderReview() {
+    const r = S.review;
+    const all = [...r.comments.map(c => ({ ...c, keep: true })), ...r.dropped.map(c => ({ ...c, keep: false }))];
+    r.all = all;
+    if (!all.length) { $('r-review').innerHTML = '<p class="tiny muted">No comments found in that text.</p>'; return; }
+    $('r-review').innerHTML = `
+        <div class="card-sub" style="margin-bottom: 8px;">${r.comments.length} to answer · ${r.dropped.length} filtered out${r.can_auto ? ` · ${r.can_auto} can be posted for you` : ''}</div>
+        <div class="stack" style="gap: 8px;">
+        ${all.map((c, i) => `
+            <label class="opt">
+                <input type="checkbox" data-i="${i}" ${c.keep ? 'checked' : ''}>
+                <div style="flex: 1; min-width: 0;">
+                    <div class="row-title">${esc(c.author || 'Someone')}${c.comment_urn ? ' <span class="q-badge q-ready" style="margin-left: 6px;">auto-post ready</span>' : ''}</div>
+                    <div class="tiny muted line-clamp-2">${esc(c.text)}</div>
+                    ${c.reason ? `<div class="tiny" style="color: #b54708; margin-top: 2px;">Filtered: ${esc(c.reason)}</div>` : ''}
+                </div>
+            </label>`).join('')}
+        </div>
+        <button type="button" class="btn btn-primary btn-md" style="margin-top: 12px;" onclick="draftReplies(this)">Draft replies</button>`;
+}
+
+async function draftReplies(btn) {
+    const picked = [...$('r-review').querySelectorAll('input[type=checkbox]:checked')].map(x => S.review.all[+x.dataset.i]);
+    if (!picked.length) { showToast('Pick at least one comment', 'error'); return; }
+    if (picked.length > 25) { showToast('Draft up to 25 replies at a time', 'error'); return; }
+    App.busy(btn, true, 'Drafting…');
+    try {
+        const r = await App.api('/api/engage/replies/draft', { method: 'POST', body: {
+            post_url: $('r-url').value.trim(), post_text: $('r-post').value,
+            comments: picked.map(c => ({ author: c.author || '', text: c.text, comment_urn: c.comment_urn || null, reply_urn: c.reply_urn || null })) } });
+        S.replies = r.drafts.map(keep);
+        renderReplies();
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+function renderReplies() {
+    $('rd-sub').textContent = `${S.replies.length} repl${S.replies.length === 1 ? 'y' : 'ies'}. Edit any of them, then approve.`;
+    $('approve-all').hidden = S.replies.length < 2;
+    $('rd-list').innerHTML = S.replies.map(d => `
+        <div class="item">
+            <div class="tiny muted" style="margin-bottom: 4px;">${esc(d.target_author || 'Someone')} wrote:</div>
+            <div class="quote line-clamp-3">${esc(d.target_text || '')}</div>
+            <textarea class="field-input" rows="4" style="margin-top: 10px;" id="rt-${d.id}">${esc(d.text || '')}</textarea>
+            <div class="row-actions">${App.qualityBadge(d.report)}${d.template_code ? `<span class="chip" style="cursor: default;">${esc(d.template_code)}</span>` : ''}${reactionSelect('rr-' + d.id, d.reaction)}</div>
+            <div class="row-actions" id="ra-${d.id}">
+                <button type="button" class="btn btn-primary btn-sm" onclick="approveReply(${d.id}, this)">${approveLabel(d)}</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="skipDraft(${d.id}, this)">Skip</button>
+            </div>
+        </div>`).join('');
+}
+
+async function approveReply(id, btn) {
+    const text = $('rt-' + id).value.trim();
+    if (!text) { showToast('Write a reply first', 'error'); return; }
+    if (!(await confirmQuality(text, 'reply'))) return;
+    App.busy(btn, true, 'Approving…');
+    try {
+        const r = await App.api(`/api/engage/${id}/approve`, { method: 'POST', body: { text, reaction: $('rr-' + id).value } });
+        afterApprove(r.draft, $('ra-' + id));
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+async function approveAll(btn) {
+    const open = S.replies.filter(d => $('ra-' + d.id) && $('ra-' + d.id).querySelector('button'));
+    if (!open.length) return;
+    const ok = await App.confirm({
+        title: `Approve ${open.length} replies?`,
+        message: autoOn() ? 'They post one at a time, 1–3 minutes apart. Replies without a comment link become Copy + Open.' : 'They become Copy + Open items in Activity.',
+        confirmText: 'Approve all',
+    });
+    if (!ok) return;
+    App.busy(btn, true, 'Approving…');
+    try {
+        const r = await App.api('/api/engage/approve-batch', { method: 'POST', body: { items: open.map(d => ({ id: d.id, text: $('rt-' + d.id).value.trim(), reaction: $('rr-' + d.id).value })) } });
+        r.drafts.forEach(d => { keep(d); const el = $('ra-' + d.id); if (el) el.innerHTML = d.status === 'manual' ? manualButtons(d) : statusBadge(d); });
+        if (r.errors.length) showToast(`${r.errors.length} couldn't be approved: ${r.errors[0].error}`, 'error');
+        else showToast(`${r.drafts.length} replies approved`);
+        refreshStatus();
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+// ── Daily targets ───────────────────────────────────
+async function loadTargets() {
+    const r = await App.api('/api/commenting/targets', { quiet: true }).catch(() => null);
+    if (!r || !r.targets.length) {
+        $('t-list').innerHTML = `<div class="empty-state" style="padding: 28px 12px;">
+            <p class="empty-state-title">No targets yet</p>
+            <p class="empty-state-text">Add people to Competitors and fetch their posts to get daily comment targets.</p>
+            <a class="btn btn-ghost btn-sm" href="/competitors">Open Competitors</a></div>`;
+        return;
+    }
+    S.targets = r.targets;
+    $('t-list').innerHTML = r.targets.map((t, i) => `
+        <div class="item">
+            <div style="display: flex; justify-content: space-between; gap: 8px;">
+                <span class="row-title">${esc(t.competitor_name)}</span>
+                <span class="tiny muted">${t.likes} likes · ${t.comments} comments</span>
+            </div>
+            <div class="tiny muted line-clamp-3" style="margin-top: 6px;">${esc(t.content_preview)}</div>
+            <div class="row-actions">
+                <button type="button" class="btn btn-primary btn-sm" onclick="useTarget(${i})">Draft comment</button>
+                ${t.post_url ? `<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="${esc(safeUrl(t.post_url))}">Open post</a>` : ''}
+            </div>
+        </div>`).join('');
+}
+
+function useTarget(i) {
+    const t = S.targets[i];
+    $('c-url').value = t.post_url || '';
+    $('c-text').value = t.content;
+    $('c-author').value = t.competitor_name;
+    showTab('comment');
+    draftComment($('c-go'), { competitor_post_id: t.id });
+}
+
+// ── Activity ────────────────────────────────────────
+function activityItem(d) {
+    keep(d);
+    const open = d.open_url ? `<a class="btn btn-ghost btn-sm" target="_blank" rel="noopener" href="${esc(safeUrl(d.open_url))}">Open post</a>` : '';
+    let actions = '';
+    if (d.status === 'approved') actions = (autoOn() ? `<button type="button" class="btn btn-ghost btn-sm" onclick="postNow(${d.id}, this)">Post now</button>` : '') +
+        `<button type="button" class="btn btn-ghost btn-sm" onclick="skipDraft(${d.id}, this)">Cancel</button>`;
+    else if (d.status === 'manual') actions = manualButtons(d) + `<button type="button" class="btn btn-ghost btn-sm" onclick="skipDraft(${d.id}, this)">Skip</button>`;
+    else if (d.status === 'failed') actions = `<button type="button" class="btn btn-ghost btn-sm" onclick="retryDraft(${d.id}, this)">Retry</button>` + manualButtons(d);
+    else if (d.status === 'unknown') actions = open + `<button type="button" class="btn btn-ghost btn-sm" onclick="markDone(${d.id}, this)">It posted</button><button type="button" class="btn btn-ghost btn-sm" onclick="retryDraft(${d.id}, this, true)">Retry</button>`;
+    else if (d.status === 'published') actions = open;
+    const who = d.target_author || (d.source === 'first_comment' ? 'your post' : 'a post');
+    const when = d.status === 'approved' ? `posts around ${App.fmtDate(d.publish_after)}` : d.published_at ? App.fmtDate(d.published_at) : '';
+    return `<div class="item">
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">${statusBadge(d)}
+            <span class="tiny muted">${d.kind === 'reply' ? 'Reply to' : d.source === 'first_comment' ? 'First comment on' : 'Comment on'} ${esc(who)}${when ? ' · ' + esc(when) : ''}</span></div>
+        <div class="tiny line-clamp-2" style="margin-top: 6px;">${esc(d.text || '')}</div>
+        ${d.error ? `<div class="tiny" style="color: ${d.status === 'manual' ? '#93370d' : '#b42318'}; margin-top: 4px;">${esc(d.error)}</div>` : ''}
+        ${actions ? `<div class="row-actions">${actions}</div>` : ''}
+    </div>`;
+}
+
+async function loadActivity() {
+    const groups = await Promise.all(['needs_you', 'pending', 'done'].map(g =>
+        App.api('/api/engage/drafts?group=' + g, { quiet: true }).then(r => r.drafts).catch(() => [])));
+    const [needs, pending, done] = groups;
+    const section = (title, list, empty) => `
+        <div class="card-title" style="margin: 4px 0 10px;">${title} <span class="muted" style="font-weight: 400;">(${list.length})</span></div>
+        ${list.length ? `<div class="stack" style="gap: 10px; margin-bottom: 22px;">${list.map(activityItem).join('')}</div>`
+                      : `<p class="tiny muted" style="margin-bottom: 22px;">${empty}</p>`}`;
+    $('a-list').innerHTML = section('Needs you', needs, 'Nothing needs you right now.') +
+        section('Scheduled', pending, 'Nothing scheduled.') + section('Recent', done, 'Nothing posted yet.');
+}
+
+async function postNow(id, btn) {
+    const ok = await App.confirm({ title: 'Post this now?', message: 'It goes live on LinkedIn under your name right away.', confirmText: 'Post now' });
+    if (!ok) return;
+    App.busy(btn, true, 'Posting…');
+    try {
+        const r = await App.api(`/api/engage/${id}/publish-now`, { method: 'POST' });
+        showToast(r.result.ok ? 'Posted' : (r.draft.error || 'Not posted'), r.result.ok ? 'success' : 'error');
+    } catch (e) { /* toast shown */ } finally { loadActivity(); refreshStatus(); }
+}
+
+async function retryDraft(id, btn, unknown = false) {
+    if (unknown && !(await App.confirm({ title: 'Retry this one?', message: 'LinkedIn never confirmed the first attempt. Open the post and check it is not already there, or it may post twice.', confirmText: 'Retry', danger: true }))) return;
+    App.busy(btn, true, '…');
+    try { await App.api(`/api/engage/${id}/retry`, { method: 'POST' }); showToast('Back in line'); }
+    catch (e) { /* toast shown */ } finally { loadActivity(); refreshStatus(); }
+}
+
+// ── Follow-ups ──────────────────────────────────────
+async function loadFollowups() {
+    const r = await App.api('/api/engage/followups', { quiet: true }).catch(() => ({ items: [] }));
+    $('f-list').innerHTML = r.items.length ? r.items.map(d => { keep(d); return `
+        <div class="item">
+            <div class="tiny muted">${esc(d.target_author || 'A post')} · posted ${esc(App.fmtDate(d.published_at))}</div>
+            <div class="tiny line-clamp-2" style="margin-top: 4px;">${esc(d.text || '')}</div>
+            <div class="row-actions">
+                ${d.open_url ? `<a class="btn btn-primary btn-sm" target="_blank" rel="noopener" href="${esc(safeUrl(d.open_url))}">Open post</a>` : ''}
+                <button type="button" class="btn btn-ghost btn-sm" onclick="followedUp(${d.id}, this)">Done</button>
+            </div>
+        </div>`; }).join('') : '<p class="tiny muted">Nothing to check right now.</p>';
+}
+
+async function followedUp(id, btn) {
+    App.busy(btn, true, '…');
+    try { await App.api(`/api/engage/${id}/followed-up`, { method: 'POST' }); loadFollowups(); }
+    catch (e) { App.busy(btn, false); }
+}
+
+renderBanners();
+const initialTab = location.hash.slice(1);
+showTab(['comment', 'reply', 'targets', 'activity', 'followups'].includes(initialTab) ? initialTab : 'comment');
+</script>
+{% endblock %}

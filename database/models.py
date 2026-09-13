@@ -90,6 +90,19 @@ class QueuedPost(Base):
     # Content recycling
     recycled_from_id = Column(Integer, nullable=True)  # ID of original post this was recycled from
 
+    # Workflow
+    approved_at = Column(DateTime, nullable=True)  # set only by an explicit approval
+    last_error = Column(Text, nullable=True)  # last publish error / warning
+    attempt_count = Column(Integer, default=0)
+    source = Column(String(50), nullable=True)  # auto, idea, studio, plan, recycle, experiment, competitor, repost
+    first_comment = Column(Text, nullable=True)  # posted right after publishing (links go here)
+
+    # Quality engine (deterministic humanizer + audit)
+    quality_score = Column(Integer, nullable=True)  # 0-100
+    quality_report = Column(Text, nullable=True)  # JSON: blockers, warnings, stats
+    formula_id = Column(String(20), nullable=True)  # F1-F20 hook formula
+    goal = Column(String(20), nullable=True)  # comments, reposts, likes, saves
+
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -209,6 +222,8 @@ class HookEntry(Base):
 
     engagement_score = Column(Integer, default=0)  # likes + comments*3 + shares*5
     topic_category = Column(String(200), nullable=True)
+    formula_id = Column(String(20), nullable=True)  # F1-F20 when extracted by Hook Lab
+    template_text = Column(Text, nullable=True)  # fill-in-the-blanks template
 
     times_used = Column(Integer, default=0)
     last_used_at = Column(DateTime, nullable=True)
@@ -482,3 +497,115 @@ class ExperimentVariation(Base):
 
     experiment = relationship("Experiment", back_populates="variations",
                               foreign_keys=[experiment_id])
+
+
+# --- App settings & AI usage ---
+
+
+class AppSetting(Base):
+    """Key/value settings edited from the dashboard (secrets stay in .env)."""
+    __tablename__ = "app_settings"
+
+    key = Column(String(100), primary_key=True)
+    value = Column(Text, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class LLMUsage(Base):
+    """One row per Claude API call, for the cost/usage view."""
+    __tablename__ = "llm_usage"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    feature = Column(String(50), index=True)
+    model = Column(String(100))
+    input_tokens = Column(Integer, default=0)
+    output_tokens = Column(Integer, default=0)
+    cache_read_tokens = Column(Integer, default=0)
+    cache_write_tokens = Column(Integer, default=0)
+    ok = Column(Boolean, default=True)
+    error = Column(String(300), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+
+
+class EngagementDraft(Base):
+    """A comment or reply drafted in Engage, and its publishing state."""
+    __tablename__ = "engagement_drafts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    kind = Column(String(10), default="comment", index=True)  # comment, reply
+    source = Column(String(20), default="url")  # url, target, paste, apify, first_comment
+
+    # What it responds to
+    post_url = Column(String(1000), nullable=True)
+    post_urn = Column(String(200), nullable=True)  # urn:li:activity|ugcPost|share:ID
+    parent_comment_urn = Column(String(300), nullable=True)  # TOP-level comment (replies)
+    reply_to_urn = Column(String(300), nullable=True)  # the exact comment answered (reaction target)
+    target_author = Column(String(200), nullable=True)
+    target_text = Column(Text, nullable=True)
+    competitor_post_id = Column(Integer, nullable=True)
+    queued_post_id = Column(Integer, nullable=True)  # own post, for first comments
+
+    # Draft
+    variants = Column(Text, nullable=True)  # JSON [{template, template_name, text, report}]
+    text = Column(Text, nullable=True)
+    template_code = Column(String(20), nullable=True)  # T1-T7 / R1-R5
+    reaction = Column(String(20), nullable=True)  # LIKE, PRAISE, EMPATHY, INTEREST, APPRECIATION, ENTERTAINMENT
+    quality_score = Column(Integer, nullable=True)
+
+    # Publishing: draft → approved → publishing → published; or manual / failed / unknown / skipped
+    status = Column(String(20), default="draft", index=True)
+    publish_after = Column(DateTime, nullable=True, index=True)
+    published_at = Column(DateTime, nullable=True, index=True)
+    reacted_at = Column(DateTime, nullable=True)
+    linkedin_comment_urn = Column(String(300), nullable=True)
+    error = Column(Text, nullable=True)
+    followed_up_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ContentPlan(Base):
+    """A 3–5 post plan for the coming week."""
+    __tablename__ = "content_plans"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    week_start = Column(String(10))  # local date (YYYY-MM-DD) of the first planned slot
+    focus = Column(Text, nullable=True)  # what the user wanted the week to be about
+    warnings = Column(Text, nullable=True)  # JSON list of guardrail notes
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    items = relationship("ContentPlanItem", back_populates="plan", cascade="all, delete-orphan",
+                         order_by="ContentPlanItem.id")
+
+
+class ContentPlanItem(Base):
+    """One planned post: when, which pillar/goal/formula, and what about."""
+    __tablename__ = "content_plan_items"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    plan_id = Column(Integer, ForeignKey("content_plans.id"), nullable=False, index=True)
+    slot_at = Column(DateTime, nullable=True)  # UTC
+    pillar = Column(String(200))
+    goal = Column(String(20))
+    formula_id = Column(String(20), nullable=True)
+    topic = Column(Text)
+    angle = Column(Text, nullable=True)  # direction for the writer, never a source of facts
+    status = Column(String(20), default="planned")  # planned, drafted, skipped
+    queued_post_id = Column(Integer, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    plan = relationship("ContentPlan", back_populates="items")
+
+
+class StudioRun(Base):
+    """One Studio tool run (write, repurpose, hook) with its input and output or error."""
+    __tablename__ = "studio_runs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    tool = Column(String(30), index=True)
+    input_json = Column(Text)
+    output_json = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)

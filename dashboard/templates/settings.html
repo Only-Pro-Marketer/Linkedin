@@ -1,242 +1,283 @@
 {% extends "base.html" %}
+
+{% block title %}Settings{% endblock %}
 {% block page_title %}Settings{% endblock %}
 
-{% block content %}
-<h2 class="section-heading mb-6" style="font-size:22px">Settings</h2>
+{% block head %}
+<style>
+    .set-row { display: flex; gap: 16px; align-items: center; justify-content: space-between; padding: 12px 0; border-top: 1px solid var(--border-primary); }
+    .set-list > .set-row:first-child { border-top: 0; }
+    .set-row .field-input[type=number] { width: 110px; }
+    .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch span { position: absolute; inset: 0; background: #d0d5dd; border-radius: 22px; transition: .15s; cursor: pointer; }
+    .switch span::before { content: ""; position: absolute; width: 18px; height: 18px; left: 2px; top: 2px; background: #fff; border-radius: 50%; transition: .15s; box-shadow: 0 1px 2px rgba(0, 0, 0, .2); }
+    .switch input:checked + span { background: var(--accent); }
+    .switch input:checked + span::before { transform: translateX(18px); }
+    .switch input:focus-visible + span { box-shadow: 0 0 0 3px rgba(0, 113, 227, .25); }
+    .cap { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; }
+    .cap-icon { width: 18px; height: 18px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; color: #fff; margin-top: 1px; }
+    .slot { display: inline-flex; gap: 2px; align-items: center; padding: 3px 4px 3px 10px; border: 1px solid var(--border-primary); border-radius: 999px; font-size: 12.5px; background: #fff; }
+    .slot.off { opacity: .5; text-decoration: line-through; }
+    .slot button { border: 0; background: none; cursor: pointer; color: var(--text-secondary); font: inherit; padding: 2px 6px; border-radius: 999px; }
+    .slot button:hover { background: #f2f4f7; color: var(--text-primary); }
+    table.usage { width: 100%; font-size: 13px; border-collapse: collapse; }
+    table.usage td, table.usage th { padding: 7px 4px; border-top: 1px solid var(--border-primary); text-align: left; }
+    table.usage th { color: var(--text-muted); font-weight: 500; font-size: 12px; border-top: 0; }
+    table.usage .num { text-align: right; }
+</style>
+{% endblock %}
 
-<div class="space-y-4 max-w-2xl">
-    <!-- LinkedIn Connection -->
-    <div class="glass-card p-6">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg>
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Settings</h1>
+        <p>Connection, limits, posting times and AI usage. API keys and secrets stay in your .env file.</p>
+    </div>
+</div>
+
+<div class="grid-main">
+    <div class="stack">
+        <!-- LinkedIn -->
+        <div class="card card-pad">
+            <div class="card-head">
+                <div>
+                    <div class="card-title">LinkedIn</div>
+                    <div class="card-sub">{% if auth_status.authenticated %}{{ auth_status.access_days_left }} days left on this login{% else %}Connect to publish posts and comments from here.{% endif %}</div>
+                </div>
+                {% if auth_status.authenticated %}<span class="q-badge q-ready"><span class="q-dot"></span>Connected</span>
+                {% else %}<span class="q-badge q-fix"><span class="q-dot"></span>Not connected</span>{% endif %}
             </div>
-            <h3 class="text-base font-semibold text-gray-900">LinkedIn Connection</h3>
+            {% for c in capabilities %}
+            <div class="cap">
+                <span class="cap-icon" style="background: {{ '#12b76a' if c.ok else '#98a2b3' }};">{{ '✓' if c.ok else '–' }}</span>
+                <div><div class="row-title">{{ c.label }}</div><div class="tiny muted">{{ c.note }}</div></div>
+            </div>
+            {% endfor %}
+            <div class="row-actions" style="margin-top: 12px;">
+                {% if auth_status.authenticated %}
+                <button type="button" class="btn btn-primary btn-sm" onclick="testLinkedIn(this)">Test connection</button>
+                {% if auth_status.has_refresh_token %}<button type="button" class="btn btn-ghost btn-sm" onclick="refreshLogin(this)">Refresh login</button>{% endif %}
+                <a href="/auth/login" class="btn btn-ghost btn-sm">Reconnect</a>
+                {% else %}
+                <a href="/auth/login" class="btn btn-primary btn-sm">Connect LinkedIn</a>
+                {% endif %}
+                <span class="tiny" id="li-test"></span>
+            </div>
         </div>
 
-        {% if auth_status and auth_status.authenticated %}
-        <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-4">
-            <div class="flex items-center gap-2 mb-2">
-                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                <span class="text-sm font-medium text-emerald-800">Connected</span>
-                <span class="text-xs text-emerald-600 ml-auto">{{ auth_status.access_days_left }} days remaining</span>
-            </div>
-            <div class="text-xs text-emerald-700 space-y-1 mt-2">
-                <p>Person URN: <code class="bg-emerald-100 px-1.5 py-0.5 rounded text-[11px]">{{ auth_status.person_urn }}</code></p>
-                <p>Refresh token: {{ 'Available' if auth_status.has_refresh_token else 'Not available' }}</p>
-            </div>
-            <!-- Scopes -->
-            <div class="mt-3 pt-3 border-t border-emerald-200">
-                <p class="text-xs font-medium text-emerald-800 mb-1.5">Permissions:</p>
-                <div class="flex flex-wrap gap-1.5">
-                    {% for scope in auth_status.scopes or [] %}
-                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-100 text-emerald-800">{{ scope }}</span>
-                    {% endfor %}
+        <!-- Automation & limits -->
+        <div class="card card-pad">
+            <div class="card-head">
+                <div>
+                    <div class="card-title">Automation and limits</div>
+                    <div class="card-sub">Background jobs are {% if scheduler_enabled %}on{% else %}off (SCHEDULER_ENABLED=false in .env){% endif %}. Nothing is published without your approval.</div>
                 </div>
             </div>
-        </div>
-        <div class="flex gap-2">
-            <button onclick="refreshToken()" class="btn btn-primary btn-sm">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                Refresh Token
-            </button>
-            <a href="/auth/login" class="btn btn-ghost btn-sm">Re-connect</a>
-        </div>
-        {% else %}
-        <p class="text-sm text-gray-600 mb-4">Connect your LinkedIn account to enable posting.</p>
-        <a href="/auth/login" class="btn btn-primary btn-md">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19 3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h14m-.5 15.5v-5.3a3.26 3.26 0 0 0-3.26-3.26c-.85 0-1.84.52-2.32 1.3v-1.11h-2.79v8.37h2.79v-4.93c0-.77.62-1.4 1.39-1.4a1.4 1.4 0 0 1 1.4 1.4v4.93h2.79M6.88 8.56a1.68 1.68 0 0 0 1.68-1.68c0-.93-.75-1.69-1.68-1.69a1.69 1.69 0 0 0-1.69 1.69c0 .93.76 1.68 1.69 1.68m1.39 9.94v-8.37H5.5v8.37h2.77z"/></svg>
-            Connect LinkedIn Account
-        </a>
-        {% endif %}
-    </div>
-
-    <!-- My LinkedIn Profile (for scraping) -->
-    <div class="glass-card p-6">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            <div class="set-list" id="fields">
+                {% for f in fields %}
+                <div class="set-row">
+                    <div>
+                        <label class="row-title" for="f-{{ f.key }}">{{ f.label }}</label>
+                        <div class="tiny muted">{{ f.help }}</div>
+                    </div>
+                    {% if f.type == 'bool' %}
+                    <label class="switch"><input type="checkbox" id="f-{{ f.key }}" data-key="{{ f.key }}" data-type="bool" {% if values[f.key] %}checked{% endif %}><span></span></label>
+                    {% else %}
+                    <input type="number" class="field-input" id="f-{{ f.key }}" data-key="{{ f.key }}" data-type="{{ f.type }}" min="{{ f.min }}" max="{{ f.max }}" step="{{ '0.5' if f.type == 'float' else '1' }}" value="{{ values[f.key] }}">
+                    {% endif %}
+                </div>
+                {% endfor %}
             </div>
-            <h3 class="text-base font-semibold text-gray-900">My LinkedIn Profile</h3>
-        </div>
-        <p class="text-xs text-gray-500 mb-3">Set your LinkedIn profile URL to enable daily post scraping via Apify. This imports your post history, engagement data, and AI analysis — no special API scope needed.</p>
-        <div class="flex gap-2 mb-3">
-            <input type="text" id="profile-url-input" placeholder="https://www.linkedin.com/in/your-username" class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none">
-            <button onclick="saveProfileUrl()" id="save-url-btn" class="btn btn-primary btn-sm">Save</button>
-        </div>
-        <div id="profile-url-status" class="hidden mb-3"></div>
-        <div class="flex gap-2">
-            <button onclick="scrapeMyProfile()" id="scrape-profile-btn" class="btn btn-sm" style="background:#eef2ff;color:#4f46e5;border:1px solid #c7d2fe;">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                Scrape Now
-            </button>
-            <a href="/analytics" class="btn btn-ghost btn-sm">View My Posts</a>
-        </div>
-        <p class="text-[11px] text-gray-400 mt-2">Auto-scrapes daily at 7:00 AM. Uses ~1 Apify actor run per scrape.</p>
-    </div>
-
-    <!-- Quick Actions -->
-    <div class="glass-card p-6">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-lg bg-violet-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <div class="row-actions" style="justify-content: flex-end;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveSettings(this)">Save</button>
             </div>
-            <h3 class="text-base font-semibold text-gray-900">Quick Actions</h3>
         </div>
-        <div class="flex flex-wrap gap-2">
-            <button onclick="runResearchFromSettings()" id="settings-research-btn" class="btn btn-ghost btn-md">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                Run Research Now
-            </button>
-            <button onclick="generateFromSettings()" id="settings-gen-btn" class="btn btn-primary btn-md">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                Generate 5 Posts
-            </button>
+
+        <!-- Posting times -->
+        <div class="card card-pad">
+            <div class="card-head">
+                <div>
+                    <div class="card-title">Posting times</div>
+                    <div class="card-sub">Approved posts go out at these times ({{ posting_timezone }}). Click a time to pause or resume it.</div>
+                </div>
+            </div>
+            <div id="slots" class="set-list"></div>
+            <div class="row-actions" style="margin-top: 14px;">
+                <select id="slot-day" class="field-input" style="width: auto;">
+                    {% for d in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'] %}<option value="{{ loop.index0 }}">{{ d }}</option>{% endfor %}
+                </select>
+                <input type="time" id="slot-time" class="field-input" style="width: auto;" value="09:00">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="addSlot(this)">Add time</button>
+            </div>
+        </div>
+
+        <!-- Your profile -->
+        <div class="card card-pad">
+            <div class="card-title">Your LinkedIn profile</div>
+            <div class="card-sub">Used by the Profile Optimizer{% if apify %}, and to import your post history through Apify{% endif %}.</div>
+            <div class="row-actions">
+                <input id="profile-url-input" class="field-input" style="flex: 1; min-width: 220px;" placeholder="https://www.linkedin.com/in/your-name" autocomplete="off">
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveProfileUrl(this)">Save</button>
+                {% if apify %}<button type="button" class="btn btn-ghost btn-sm" onclick="importMyPosts(this)">Import my posts</button>{% endif %}
+            </div>
+            <p class="tiny muted" id="profile-url-status" style="margin-top: 8px;"></p>
         </div>
     </div>
 
-    <!-- Scheduler -->
-    <div class="glass-card p-6">
-        <div class="flex items-center gap-3 mb-4">
-            <div class="w-10 h-10 rounded-lg bg-amber-50 flex items-center justify-center">
-                <svg class="w-5 h-5 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+    <div class="stack">
+        <!-- AI usage -->
+        <div class="card card-pad">
+            <div class="card-title">AI usage · 30 days</div>
+            <div style="display: flex; gap: 28px; margin: 12px 0 6px;">
+                <div><div class="metric-value" style="font-size: 24px;">{% if usage.cost_usd is not none %}${{ '%.2f'|format(usage.cost_usd) }}{% else %}–{% endif %}</div><div class="tiny muted">estimated cost</div></div>
+                <div><div class="metric-value" style="font-size: 24px;">{{ usage.calls }}</div><div class="tiny muted">Claude calls</div></div>
             </div>
-            <h3 class="text-base font-semibold text-gray-900">Scheduler</h3>
+            <p class="tiny muted">Model: {{ model }}{% if not has_key %} · <b style="color: #b42318;">ANTHROPIC_API_KEY is missing from .env</b>{% endif %}</p>
+            {% if usage_features %}
+            <div style="overflow-x: auto;">
+                <table class="usage" style="margin-top: 10px;">
+                    <tr><th>Feature</th><th class="num">Calls</th><th class="num">Cost</th></tr>
+                    {% for u in usage_features %}
+                    <tr>
+                        <td>{{ u.feature }}{% if u.errors %} <span class="tiny" style="color: #b42318;">· {{ u.errors }} failed</span>{% endif %}</td>
+                        <td class="num">{{ u.calls }}</td>
+                        <td class="num">{% if u.cost_usd is not none %}${{ '%.2f'|format(u.cost_usd) }}{% else %}–{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
         </div>
-        <div class="space-y-3">
-            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
-                <span class="w-2 h-2 rounded-full bg-blue-400"></span>
-                <span class="text-sm text-gray-700 flex-1">Research cycle</span>
-                <span class="text-sm font-medium text-gray-900">Every 6 hours</span>
+
+        <!-- Run now -->
+        <div class="card card-pad">
+            <div class="card-title">Run now</div>
+            <div class="row-actions">
+                <button type="button" class="btn btn-ghost btn-sm" onclick="runResearch(this)">Research topics</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="writeDrafts(this)">Write 3 drafts</button>
             </div>
-            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
-                <span class="w-2 h-2 rounded-full bg-violet-400"></span>
-                <span class="text-sm text-gray-700 flex-1">Post generation</span>
-                <span class="text-sm font-medium text-gray-900">Every 4 hours <span class="text-xs text-gray-400">(when queue &lt; 10)</span></span>
-            </div>
-            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
-                <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                <span class="text-sm text-gray-700 flex-1">Posting check</span>
-                <span class="text-sm font-medium text-gray-900">Every 15 minutes</span>
-            </div>
-            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
-                <span class="w-2 h-2 rounded-full bg-indigo-400"></span>
-                <span class="text-sm text-gray-700 flex-1">My profile scrape</span>
-                <span class="text-sm font-medium text-gray-900">Daily at 7 AM</span>
-            </div>
-            <div class="flex items-center gap-3 py-2 border-b border-gray-100">
-                <span class="w-2 h-2 rounded-full bg-orange-400"></span>
-                <span class="text-sm text-gray-700 flex-1">Competitor scrape</span>
-                <span class="text-sm font-medium text-gray-900">Daily at 6 AM</span>
-            </div>
-            <div class="flex items-center gap-3 py-2">
-                <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                <span class="text-sm text-gray-700 flex-1">Token refresh check</span>
-                <span class="text-sm font-medium text-gray-900">Daily at midnight</span>
+        </div>
+
+        <!-- Background jobs -->
+        <div class="card card-pad">
+            <div class="card-title">Background jobs</div>
+            <div class="set-list" style="margin-top: 6px;">
+                {% for j in jobs %}
+                <div class="set-row" style="padding: 8px 0;"><span class="tiny">{{ j.name }}</span><span class="tiny muted" style="text-align: right;">{{ j.when }}</span></div>
+                {% endfor %}
             </div>
         </div>
     </div>
 </div>
 
 <script>
-// Load current profile URL on page load
-document.addEventListener('DOMContentLoaded', async () => {
-    try {
-        const res = await fetch('/api/profile/url');
-        const data = await res.json();
-        if (data.url) {
-            document.getElementById('profile-url-input').value = data.url;
-        }
-    } catch(e) {}
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const $ = (id) => document.getElementById(id);
+
+async function saveSettings(btn) {
+    const values = {};
+    document.querySelectorAll('#fields [data-key]').forEach(el => {
+        values[el.dataset.key] = el.dataset.type === 'bool' ? el.checked : Number(el.value);
+    });
+    App.busy(btn, true, 'Saving…');
+    try { await App.api('/api/settings', { method: 'POST', body: { values } }); showToast('Settings saved'); }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+// ── Posting times ───────────────────────────────────
+async function loadSlots() {
+    const r = await App.api('/api/calendar', { quiet: true }).catch(() => ({ slots: [] }));
+    const byDay = {};
+    r.slots.forEach(s => { (byDay[s.day_of_week] = byDay[s.day_of_week] || []).push(s); });
+    $('slots').innerHTML = DAYS.map((d, i) => `
+        <div class="set-row" style="padding: 8px 0; justify-content: flex-start;">
+            <span class="row-title" style="width: 44px;">${d}</span>
+            <div style="display: flex; gap: 6px; flex-wrap: wrap; flex: 1;">
+                ${(byDay[i] || []).map(s => `
+                    <span class="slot ${s.is_active ? '' : 'off'}">
+                        <button type="button" data-act="toggle" data-day="${s.day_of_week}" data-time="${esc(s.time_slot)}" data-active="${s.is_active ? '1' : ''}" title="${s.is_active ? 'Pause' : 'Resume'} this time">${esc(s.time_slot)}</button>
+                        <button type="button" data-act="delete" data-id="${s.id}" title="Remove" aria-label="Remove ${esc(s.time_slot)}">×</button>
+                    </span>`).join('') || '<span class="tiny muted">No posts</span>'}
+            </div>
+        </div>`).join('');
+}
+
+$('slots').addEventListener('click', async (e) => {
+    const b = e.target.closest('button[data-act]');
+    if (!b) return;
+    if (b.dataset.act === 'toggle') {
+        await App.api('/api/calendar', { method: 'POST', body: { day_of_week: +b.dataset.day, time_slot: b.dataset.time, is_active: !b.dataset.active } }).catch(() => {});
+    } else {
+        const ok = await App.confirm({ title: 'Remove this posting time?', message: 'Approved posts will use your other times.', confirmText: 'Remove', danger: true });
+        if (!ok) return;
+        await App.api(`/api/calendar/${b.dataset.id}`, { method: 'DELETE' }).catch(() => {});
+    }
+    loadSlots();
 });
 
-async function saveProfileUrl() {
-    const btn = document.getElementById('save-url-btn');
-    const input = document.getElementById('profile-url-input');
-    const status = document.getElementById('profile-url-status');
-    const url = input.value.trim();
+async function addSlot(btn) {
+    const time = $('slot-time').value;
+    if (!/^\d{2}:\d{2}$/.test(time)) { showToast('Pick a time', 'error'); return; }
+    App.busy(btn, true, '…');
+    try { await App.api('/api/calendar', { method: 'POST', body: { day_of_week: +$('slot-day').value, time_slot: time, is_active: true } }); loadSlots(); }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
 
-    if (!url) { showToast('Please enter a LinkedIn profile URL', 'error'); return; }
-
-    btn.disabled = true; btn.textContent = 'Saving...';
+// ── LinkedIn ────────────────────────────────────────
+async function testLinkedIn(btn) {
+    App.busy(btn, true, 'Testing…');
     try {
-        const res = await fetch('/api/profile/set-url', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({linkedin_profile_url: url}),
-        });
-        const data = await res.json();
-        if (res.ok) {
-            showToast('Profile URL saved!');
-            status.className = 'text-xs text-emerald-600 mb-3';
-            status.textContent = 'Saved. Click "Scrape Now" to import your posts.';
-            status.classList.remove('hidden');
-        } else {
-            showToast(data.error || 'Failed to save', 'error');
-        }
-    } catch(e) { showToast('Save failed', 'error'); }
-    finally { btn.disabled = false; btn.textContent = 'Save'; }
+        const r = await App.api('/api/linkedin/test', { method: 'POST' });
+        $('li-test').textContent = r.message;
+        $('li-test').style.color = r.ok ? '#067647' : '#b42318';
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
 }
 
-async function scrapeMyProfile() {
-    const btn = document.getElementById('scrape-profile-btn');
-    const status = document.getElementById('profile-url-status');
-    btn.disabled = true;
-    btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg> Scraping...';
+async function refreshLogin(btn) {
+    App.busy(btn, true, 'Refreshing…');
+    try { await App.api('/auth/refresh', { method: 'POST' }); showToast('Login refreshed'); setTimeout(() => location.reload(), 800); }
+    catch (e) { App.busy(btn, false); }
+}
 
+// ── Profile URL / import ────────────────────────────
+async function loadProfileUrl() {
+    const r = await App.api('/api/profile/url', { quiet: true }).catch(() => null);
+    if (r && r.url) $('profile-url-input').value = r.url;
+}
+
+async function saveProfileUrl(btn) {
+    const url = $('profile-url-input').value.trim();
+    if (!url) { showToast('Enter your LinkedIn profile URL', 'error'); return; }
+    App.busy(btn, true, 'Saving…');
+    try { await App.api('/api/profile/set-url', { method: 'POST', body: { linkedin_profile_url: url } }); $('profile-url-status').textContent = 'Saved.'; }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+async function importMyPosts(btn) {
+    App.busy(btn, true, 'Importing…');
     try {
-        const res = await fetch('/api/profile/scrape', {method: 'POST'});
-        const data = await res.json();
-        if (res.ok) {
-            const msg = `Scrape complete! ${data.new_posts} new posts, ${data.updated_posts} updated, ${data.analyzed} analyzed. Total: ${data.total_posts}`;
-            showToast(msg);
-            status.className = 'text-xs text-emerald-600 mb-3';
-            status.innerHTML = msg;
-            status.classList.remove('hidden');
-
-            if (data.profile && data.profile.name) {
-                status.innerHTML += `<br>Profile: ${data.profile.name} | ${data.profile.followers} followers`;
-            }
-        } else {
-            showToast(data.error || 'Scrape failed', 'error');
-            status.className = 'text-xs text-red-600 mb-3';
-            status.textContent = data.error || 'Scrape failed';
-            status.classList.remove('hidden');
-        }
-    } catch(e) { showToast('Scrape failed: ' + e.message, 'error'); }
-    finally {
-        btn.disabled = false;
-        btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg> Scrape Now';
-    }
+        const r = await App.api('/api/profile/scrape', { method: 'POST' });
+        $('profile-url-status').textContent = `${r.new_posts} new posts, ${r.updated_posts} updated. ${r.total_posts} in total.`;
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
 }
 
-async function refreshToken() {
-    const res = await fetch('/auth/refresh', {method: 'POST'});
-    const data = await res.json();
-    if (res.ok) { showToast('Token refreshed!'); setTimeout(() => location.reload(), 1000); }
-    else { showToast('Refresh failed: ' + (data.error || 'unknown'), 'error'); }
+// ── Run now ─────────────────────────────────────────
+async function runResearch(btn) {
+    App.busy(btn, true, 'Researching…');
+    try { const r = await App.api('/api/research/run', { method: 'POST' }); showToast(`Found ${r.items_found} topics`); }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
 }
 
-async function runResearchFromSettings() {
-    const btn = document.getElementById('settings-research-btn');
-    btn.disabled = true; btn.textContent = 'Researching...';
-    try {
-        const res = await fetch('/api/research/run', {method: 'POST'});
-        const data = await res.json();
-        showToast(`Found ${data.items_found} research items`);
-    } catch(e) { showToast('Research failed', 'error'); }
-    finally { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg> Run Research Now'; }
+async function writeDrafts(btn) {
+    const ok = await App.confirm({ title: 'Write 3 drafts?', message: 'Claude writes 3 posts from your research and adds them to your Queue for review. This uses AI credits.', confirmText: 'Write drafts' });
+    if (!ok) return;
+    App.busy(btn, true, 'Writing…');
+    try { const r = await App.api('/api/generate', { method: 'POST', body: { count: 3 } }); showToast(`${r.count} drafts added to your Queue`); }
+    catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
 }
 
-async function generateFromSettings() {
-    const btn = document.getElementById('settings-gen-btn');
-    btn.disabled = true; btn.textContent = 'Generating...';
-    try {
-        const res = await fetch('/api/generate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({count: 5}) });
-        const data = await res.json();
-        showToast(`Generated ${data.count} posts! Check the Queue.`);
-    } catch(e) { showToast('Generation failed', 'error'); }
-    finally { btn.disabled = false; btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg> Generate 5 Posts'; }
-}
+loadSlots();
+loadProfileUrl();
 </script>
 {% endblock %}

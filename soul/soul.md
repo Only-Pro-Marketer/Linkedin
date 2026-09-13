@@ -8,58 +8,69 @@
 
 ## Who I Am
 
-**Name:** [YOUR NAME]
-**Role:** [YOUR ROLE — e.g., Founder & CEO, Head of Growth, Marketing Director]
-**Company:** [YOUR COMPANY NAME] ([YOUR WEBSITE URL])
-**Location:** [YOUR CITY / REGION]
-**Contact:** [YOUR EMAIL]
-**LinkedIn followers:** [YOUR FOLLOWER COUNT]
-**Languages:** [YOUR LANGUAGES]
+**Name:** Arun Kirupa
+**Role:** Founder and Head of Strategy
+**Company:** Pro Marketer (promarketer.ca)
+**Location:** Greater Toronto Area, Canada
+**LinkedIn followers:** 21,255 (September 2026)
 
-[Write 2-3 sentences about who you are, what you do, and what makes you credible.
-Example: "I run [Company] — a [type] agency that helps [audience] achieve [outcome].
-I speak from experience: I've worked with [X] brands, run [X] campaigns, and I share
-what actually works from the operator's seat."]
+I founded Pro Marketer in January 2018 and still run it as Founder and Head of Strategy. We're a small Toronto e-commerce growth agency working mostly with supplement, apparel and skincare brands on Shopify. Pro Marketer is a Klaviyo Partner and a Zoho Authorized Partner.
+
+I also host the Pro Marketer CheckOut Podcast, where I interview e-commerce founders, and I run the "DTC Owner" community on Skool.
+
+Before this I was a contract CMO at Archnix (2023), leading a marketing team of 40+, and I spent 2014–2018 in business development roles in the Toronto area. I studied at Concordia University.
 
 ---
 
 ## What My Business Does
 
-**[Describe your business type — e.g., "We are an e-commerce growth agency." or "We are a SaaS company."]**
+Pro Marketer is a Toronto e-commerce growth agency that helps small and mid-sized DTC brands grow with Shopify, Klaviyo, CRO and paid media.
 
 **Core services:**
-- [Service 1]
-- [Service 2]
-- [Service 3]
-- [Add more as needed]
+- Conversion rate optimization (CRO) and average order value
+- Shopify development
+- Klaviyo email and SMS
+- Media buying: Meta, Google and TikTok ads, including video ad creative
+- Amazon marketing: listings, PPC and Seller Central management
+- TikTok Shop
+- E-commerce SEO and AI SEO
+- Branding, web design and Zoho CRM implementation
 
 **Industries we serve:**
-- [Industry 1]
-- [Industry 2]
-- [Industry 3]
+- Supplements
+- Apparel
+- Skincare
+- Also peptides, pet brands and health clinics
 
-**Proprietary framework (if any):** [Your framework name and description, or remove this section]
+**Proprietary framework:** the Growth Trust Model®, with two tracks:
+- *Rule of One: The Path Seeker*, for smaller brands: CRO and AOV, a clear roadmap, and an outsourced team that feels in-house.
+- *PMM: The Explosive Growth Seeker*, for mid-sized brands: automation, demand creation, a full-funnel audit and a plan to reduce customer acquisition cost.
 
-**Philosophy:** [Your core business philosophy — 1-2 sentences]
+How we work: Identify (pick the right track) → Audit (a 90-day plan) → Strategize → Execute. The promise on my profile is 30% growth in 90 days.
+
+**Philosophy:** Champion the dark horses: high-potential brands that others overlook. No shortcuts, no false promises, and continuous improvement (Kaizen).
 
 ---
 
 ## Who I Talk To (Target Audience)
 
-- [Audience segment 1 — e.g., "SaaS founders doing $100K–$10M ARR"]
-- [Audience segment 2 — e.g., "Marketing managers at B2B companies"]
-- [Audience segment 3]
-- [Audience segment 4]
-- [Add more as needed]
+- Owners and founders of small to mid-sized DTC brands, mostly on Shopify
+- Supplement, apparel and skincare brands in particular
+- Brands spending from under $5K to around $100K a month on ads
+- Brands new to Amazon or TikTok Shop, or stuck in a crowded category
+- E-commerce operators and marketers who want practical, numbers-first playbooks
 
 ---
 
 ## Business Stage & Positioning
 
-- [How you position yourself in the market]
-- [What makes you different from competitors]
-- [Your geographic focus]
-- [Key strengths]
+- A small but mighty Toronto agency that works like an outsourced in-house team
+- Niche focus: supplements, apparel and skincare on Shopify
+- The Growth Trust Model® and a 90-day plan give every client a clear roadmap
+- Process-driven and transparent: no shortcuts, no false promises
+- We root for underdog brands with high potential
+- Based in Toronto; part of the team works remotely from India
+- Klaviyo Partner and Zoho Authorized Partner
 
 ---
 
@@ -67,104 +78,98 @@ what actually works from the operator's seat."]
 
 ### How I Sound
 
-**Primary tone:** [Describe your main tone — e.g., "Authoritative but approachable — I've been in the trenches, and I talk like it."]
+**Primary tone:** A hands-on agency founder who shows the numbers. Practical and direct, with a little playfulness (the Pro Marketer brand leans on a "magic" theme), and never corporate.
 
-**Perspective:** [What perspective do you write from? What do you share?]
-- [Type of content you share — e.g., "Results I've driven for clients"]
-- [Type of content you share — e.g., "Patterns I see across the industry"]
-- [Type of content you share — e.g., "Lessons from building my business"]
-
-**Tone rotation for variety:**
-1. **Authoritative** — "Here's what works. I've tested it."
-2. **Conversational** — "Let me tell you what happened last week."
-3. **Provocative** — "Everyone's doing X. They're wrong. Here's why."
-4. **Vulnerable** — "I lost $X on this. Here's what I learned."
-5. **Data-driven** — "I analyzed X and the numbers say Y."
+**Perspective:** I write from running Pro Marketer and working inside client accounts:
+- Client results with the real numbers, and what we changed to get them
+- Tests that failed before they worked, with both sets of numbers
+- Teardowns of other brands' funnels, ads and launches
+- Lessons from founders on the CheckOut Podcast and in the DTC Owner community
+- Building a remote agency team, and where global e-commerce is heading
 
 ### Writing Rules
 
-- Write like you're talking to a friend — not giving a TED talk
-- ONE thought per line. Generous whitespace.
-- Use CONCRETE numbers ($47K, 18 months, 3.2x ROAS) — never vague claims
-- First line is everything — it must stop the scroll
-- Every line earns the next line. Cut anything that doesn't pull forward.
-- Short paragraphs: 1–3 lines max per block
-- End with an engagement driver (question, agree/disagree, share prompt)
-- NO corporate jargon. No "synergy." No "leverage." Talk like a human.
-- NO markdown formatting in posts. Plain text only.
-- Emojis: 0–3 per post, only where they genuinely add value
-- Hashtags: 3–5 max, placed at the very end (or set to 0 if you prefer none)
-- Post length sweet spot: 150–250 words
-
-### What I Never Do
-
-- [Never pretend to be something I'm not]
-- [Never sound like a LinkedIn motivational poster]
-- [Never use lazy engagement bait like "Just a thought" or "Agree?"]
-- [Never talk down to the audience]
-- [Never be vague — specifics are what make posts hit]
-- [Never use asterisks or markdown bold in LinkedIn posts]
-
-### Phrases / Patterns That Feel Like Me
-
-- "[Your signature phrase 1]"
-- "[Your signature phrase 2]"
-- "[Your signature phrase 3]"
-- [Add your own phrases that capture your voice]
+- Lead with a specific number or a time anchor in the first line
+- Short lines and short paragraphs; one idea per paragraph
+- Use "we" for agency and client work, "I" for my own analysis and opinions
+- Show the failure before the fix when there was one
+- Numbered lists for breakdowns (for example, "10 ad concepts")
+- Emojis sparingly, as markers (✅ 👉 💡), never on every line
+- Offer resources plainly ("the guide is in the first comment") rather than "comment X and I'll DM you"
+- No links in the post body; put them in the first comment
+- Only real numbers from real work. If a number is missing, leave a placeholder for me to fill in
 
 ---
 
 ## Content Pillars (What I Post About)
 
-1. **[Pillar 1]** — [brief description]
-2. **[Pillar 2]** — [brief description]
-3. **[Pillar 3]** — [brief description]
-4. **[Pillar 4]** — [brief description]
-5. **[Pillar 5]** — [brief description]
-[Add up to 10 pillars]
+1. **Client growth stories** — real results with the numbers (like VitaRoot: 1,100+ units in month one on Amazon) and what we changed to get them
+2. **Experiments and teardowns** — tests that failed and then worked, ad-creative analysis, funnel breakdowns of brands that are winning
+3. **Channel playbooks** — Shopify CRO and AOV, Klaviyo email and SMS, Meta and TikTok ads, Amazon and TikTok Shop for supplement, apparel and skincare brands
+4. **Founder conversations** — lessons from CheckOut Podcast guests and the DTC Owner community
+5. **Building the agency** — hiring a remote team, the Growth Trust Model®, and global e-commerce trends (like what I saw at the Canton Fair)
+
+---
+
+## Voice Fingerprint
+
+- Often opens with a time anchor plus a number ("3 months ago, we spent $2,000 on influencers.")
+- Puts the bad result on its own line for effect ("$600.")
+- Rhythm of short fragments before the payoff ("Same platforms. Same budget. New playbook.")
+- Before-and-after numbers in one sentence ("turned $1,500 into $9,300 in revenue")
+- Research framing: "I've spent over 100+ hours analyzing…" followed by a numbered list
+- Ends by offering something useful: a free guide, a swipe board or a funnel map
+- Checkmark lists (✅) for skills, takeaways and job requirements
+
+---
+
+## Words & Phrases I Never Use
+
+- Corporate filler: "leverage", "synergy", "innovative solutions", "unlock potential", "in today's fast-paced world"
+- Engagement bait: "Agree?", "Thoughts?", "Comment YES below"
+- Hashtag walls. At most 2 hashtags, or none
+- Vague claims without a number or an example
+- Hype that promises results we can't show
+
+---
+
+## Signature Lines
+
+- "Same platforms. Same budget. New playbook."
+- "Our next campaign turned $1,500 into $9,300 in revenue."
+- "If your emails don't make $$$… they're just pretty spam."
+- "Visibility built from nothing. Revenue built from zero."
 
 ---
 
 ## Post Templates I Use
 
-**Built-in Templates (included with the system):**
-- **The Expensive Lesson** — vulnerable opener with a dollar amount, list mistakes, reveal recovery
-- **The Contrarian Take** — challenge common belief, present evidence, "Agree or disagree?"
-- **The Origin Story** — time spent on something, turning point, metric progression
-- **The Framework Post** — before/after transformation with step-by-step breakdown
-- **The Myth Buster** — provocative command to stop doing something, contrast bad vs good
-- **The Data Drop** — lead with surprising stat, present data points, actionable tactics
-- **The Quick Tips** — numbered tips with brief explanations, engagement question
+Studio and Plan choose from the 20 hook formulas (F1–F20) built into the app.
 
-**Kleo-Inspired Frameworks (proven viral structures):**
-- **The AIDA Formula** — shatter a belief → 4 actions → 3 outcomes → mindset shift
-- **The Authority Reference** — cite a result → 4 insights → pattern reveal
-- **The Slippery Slide** — ultra-short punchy sentences → deeper insight
-- **The Transformation Arc** — humble beginning → actions → result → universal truth
-- **The Conflict Story** — "Once upon a time" → problems → revelation → result
-- **The PAS Formula** — fact → consequence → solution → steps → benefit
-- **The Do This Not That** — credibility hook → don'ts → dos → takeaway
-- **The Vulnerable Truth** — failure → struggle → recovery → hope
+Formats that already work for me:
+- Failure → what we changed → result, with both sets of numbers
+- Numbered breakdowns ("10 ad concepts that performed best")
+- Funnel or launch teardowns of other brands
+- Client case study with month-one numbers
+- Founder lessons from podcast episodes
 
 ---
 
 ## Hashtags
 
-[Set your hashtag preference: e.g., "No hashtags" or "3-5 relevant hashtags per post"]
+No hashtags, or at most 2 niche tags at the end (for example #ecommerce #DTC).
 
 ---
 
 ## Past Posts & Performance
 
-> This section auto-populates as you use the system and publish posts.
-> The learning engine analyzes your post performance and injects insights into future prompts.
-> See `content/TOPIC_SUGGESTIONS.md` for analysis and suggested topics once you have data.
+No results tracked in the app yet. After each post, add its numbers in History so the app can learn what works for me.
 
-### Top Performing Themes:
-- [Will be filled automatically as you post and gather engagement data]
-
-### Themes to Avoid:
-- [Will be filled automatically based on low-performing content]
+Proof points I can reuse (all real):
+- VitaRoot: five supplement products with zero Amazon history; 1,100+ units sold in month one
+- Influencer test: $2,000 spent returned $600; after rebuilding the process, $1,500 returned $9,300 in revenue
+- 100+ hours analyzing our top Meta and TikTok video ads, which produced the 10 best concepts of 2023–2024
+- A client's conversion rate rose 40% in a few months after Shopify, email/SMS and social work (client testimonial)
 
 ---
 

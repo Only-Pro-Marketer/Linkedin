@@ -18,6 +18,14 @@ env/
 
 # Database
 *.db
+*.db-wal
+*.db-shm
+database/.secret_key
+database/backups/
+soul/soul.md.bak
+
+# Tests
+.pytest_cache/
 
 # Logs
 *.log

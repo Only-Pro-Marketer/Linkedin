@@ -1,84 +1,55 @@
-"""Build Claude API prompts from templates, research context, and brand persona."""
+"""Prompts for post generation.
 
-from pathlib import Path
+The brand voice and the writing rules live in the cached system prompt (see
+llm.system_blocks); the functions here only build the per-request user message.
+Third-party text (research, competitor posts) is wrapped with llm.untrusted().
+"""
 
+from content.brand import get_niche
 from existing_tool.models import PostTemplate
+from llm import untrusted
 
-# ── Load brand persona from soul/soul.md ────────────────────────
-_SOUL_PATH = Path(__file__).resolve().parent.parent / "soul" / "soul.md"
+# Sent as system instructions for every post-writing call. Merges the engine's
+# original rules with the 2026 findings from the linkedin-skills research.
+WRITING_RULES = """LINKEDIN WRITING RULES — follow them in every post:
+
+HOOK
+1. The first line is a statement or a specific number with a referent ("$4,730 in March ad spend", not "a lot of money"). Never open with a question, "Here's what/how…", "Stop X, start Y", "In today's…" or an announcement ("I'm excited to share").
+2. The hook must land within the first ~140 characters, before LinkedIn's "…see more".
+
+SHAPE
+3. 150–250 words (about 900–1,500 characters). Plain text only: no markdown, no asterisks, no hashtags, no links in the body (links go in the first comment).
+4. One or two sentences per paragraph, with a blank line between paragraphs. Keep the whole post under 22 line breaks — LinkedIn cuts posts after about 25. Short list items may sit on consecutive lines.
+5. One contrast and at most one list of three per post. No reveal bridges ("The result?", "Plot twist:", "Here's the thing"), no "It's not X, it's Y", no staccato runs ("Short. Punchy. Done."), no one-word paragraphs.
+
+VOICE
+6. Specific beats vague: real numbers with context, named tools, places and dates. But never present invented numbers or client stories as real — use only facts from the brand profile or the request, or make it clearly hypothetical.
+7. Avoid AI vocabulary: leverage, streamline, harness, delve, unlock, foster, elevate, empower, robust, seamless, landscape, crucial, significant, notably, game-changer, deep dive. Use at most one em dash; prefer commas or colons.
+8. No sincerity announcements ("let me be honest", "real talk", "unpopular opinion"). State an uncomfortable fact plainly instead.
+9. 0–2 emoji, never at the start of every line.
+
+CLOSE
+10. End with one specific question that anyone in the audience can answer from their own experience. Never "Thoughts?", "Agree?", "Agree or disagree?" or "What do you think?". A one-line P.S. is fine when there is a real follow-up.
+
+FORMAT EXAMPLE (layout only):
+I paid $47K for a marketing tool we cancelled after 90 days.
+
+Month one, revenue dipped 12% while the team learned it.
+
+By month three, clients were confused by the new reports, so we pulled the plug.
+
+What we kept was the one habit it forced on us: a weekly 20-minute numbers review.
+
+Which tool did you cancel last year, and what did it teach you?"""
+
+# Backwards-compatible alias (older modules import VIRALITY_RULES).
+VIRALITY_RULES = WRITING_RULES
+
+OUTPUT_ONLY = "Output only the finished post text — no title, no explanation, no quotation marks."
 
 
-def _load_soul() -> str:
-    """Read soul.md and return its contents (or a fallback message)."""
-    try:
-        return _SOUL_PATH.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return "(soul/soul.md not found — please create it from the template)"
-
-
-def _build_brand_persona() -> str:
-    """Build the BRAND_PERSONA prompt section from soul.md."""
-    soul = _load_soul()
-    return f"""You are writing a LinkedIn post for the person described below.
-Read their profile carefully and adopt their voice, tone, and perspective.
-
---- BRAND IDENTITY (from soul.md) ---
-{soul}
---- END BRAND IDENTITY ---
-
-IMPORTANT RULES:
-- Write from the perspective described in the soul file above.
-- Match the voice, tone, and audience defined there.
-- Use concrete numbers and specifics — never vague claims.
-- Every post should feel authentic to this person's brand.
-"""
-
-
-BRAND_PERSONA = _build_brand_persona()
-
-VIRALITY_RULES = """VIRALITY REQUIREMENTS — follow these strictly:
-
-1. FIRST LINE must be a scroll-stopper (pattern interrupt). It gets 80% of the attention.
-2. ONE thought per line. Every thought gets its own line.
-3. Use CONCRETE numbers over vague claims ($47K not "a lot of money", 18 months not "a while").
-4. Include at least one unexpected insight or contrarian angle.
-5. End with an engagement driver (question, agree/disagree, share prompt).
-6. Total length: 150-250 words (LinkedIn sweet spot for engagement).
-7. NO corporate jargon. Write like you talk to a friend.
-8. Do NOT use asterisks or markdown formatting. Plain text only.
-9. Limit emoji to 0-3 per post (only where they add value, like checkmarks in lists).
-10. Do NOT include any hashtags. No # symbols at all.
-
-LINKEDIN ALGORITHM RULES (2025-2026):
-11. The first 2-3 sentences MUST create enough curiosity that the reader expands the post. LinkedIn measures DWELL TIME — how long people spend reading. Write to maximize time-on-post.
-12. End with an EASY-TO-ANSWER question. Posts ending with questions get 72% more comments. The question should be something anyone in the audience can answer from their own experience.
-13. Write for SAVES and SENDS — include at least one framework, insight, or data point valuable enough that someone would bookmark this post or send it to a colleague.
-14. Hit enter twice after your hook. The whitespace creates a visual pause that increases click-through.
-15. NEVER use images unless specifically requested. Text-only posts perform 16x better for this account.
-
-CRITICAL FORMATTING RULE:
-Put a BLANK LINE between every thought/sentence. This is non-negotiable.
-The ONLY exception is list items (numbered lists, bullet points, timeline entries) which stay grouped together.
-
-CORRECT example:
-I spent $47K on a marketing tool.
-
-It completely failed.
-
-Here's what happened:
-
-Month 1: Revenue dropped 12%.
-Month 2: Clients got confused.
-Month 3: I pulled the plug.
-
-So I tried something different.
-
-WRONG example (lines crammed together without blank lines):
-I spent $47K on a marketing tool.
-It completely failed.
-Here's what happened.
-So I tried something different.
-"""
+def _section(title: str, body: str) -> str:
+    return f"\n{title}\n{body}\n" if body else ""
 
 
 def build_generation_prompt(
@@ -90,169 +61,60 @@ def build_generation_prompt(
     performance_context: str = "",
     hook_examples: list[str] | None = None,
 ) -> str:
-    """Build a complete Claude prompt for generating a LinkedIn post."""
-    research_section = ""
-    if research_context:
-        research_section = f"""
-TRENDING CONTEXT (use this as inspiration, NOT as a script):
-{research_context}
-"""
-
-    performance_section = ""
-    if performance_context:
-        performance_section = f"\n{performance_context}\n"
-
-    hooks_section = ""
+    """User message for generating one post from a template."""
+    hooks = ""
     if hook_examples:
-        hooks_list = "\n".join(f"- {h}" for h in hook_examples[:5])
-        hooks_section = f"""
-WINNING HOOKS FOR INSPIRATION (these scored highest engagement):
-{hooks_list}
+        hooks = "\n".join(f"- {h}" for h in hook_examples[:5])
+        hooks += "\nStudy their structure and energy; write something original. Do not copy them."
 
-Study the STRUCTURE and ENERGY of these hooks, then create something ORIGINAL in the same style.
-Do NOT copy them — use them to understand what makes a scroll-stopping first line.
-"""
+    research = untrusted(research_context, "research") if research_context else ""
 
-    return f"""{BRAND_PERSONA}
+    return f"""Write one LinkedIn post.
 
-{VIRALITY_RULES}
-{performance_section}{hooks_section}
-TEMPLATE TO FOLLOW: "{template.name}"
-
-TEMPLATE STRUCTURE:
-Hook Pattern: {template.hook_pattern}
-Body Pattern: {template.body_pattern}
-CTA Pattern: {template.cta_pattern}
-
-TEMPLATE INSTRUCTIONS:
-{template.fill_instructions}
+TEMPLATE: "{template.name}"
+Hook pattern: {template.hook_pattern}
+Body pattern: {template.body_pattern}
+CTA pattern: {template.cta_pattern}
+Template notes: {template.fill_instructions}
 
 TOPIC: {topic}
 TONE: {tone}
 ANGLE: {angle}
-{research_section}
-WRITING INSTRUCTIONS:
-1. Follow the template structure above — same hook type, body format, and CTA style.
-2. Fill all [PLACEHOLDER] markers with content relevant to e-commerce growth, marketing, and the brands you serve.
-3. Use a {tone} tone throughout.
-4. The angle should be: {angle}
-5. Make it feel authentic and personal — NOT templated or AI-generated.
-6. Include specific, concrete details (real challenges, real numbers, real scenarios).
-7. The hook MUST stop the scroll — it should make someone pause mid-feed.
-8. Every line should earn the next line. Cut anything that doesn't pull the reader forward.
+{_section("WHAT HAS WORKED FOR THIS ACCOUNT:", performance_context)}{_section("WINNING HOOKS FROM PAST POSTS (inspiration only):", hooks)}{_section("TRENDING CONTEXT (inspiration, not a script):", research)}
+INSTRUCTIONS:
+1. Follow the template's structure. When the template conflicts with the writing rules, the writing rules win.
+2. Replace any [PLACEHOLDER] with specifics from the brand profile or the topic — never with invented results presented as real.
+3. Use a {tone} tone and this angle: {angle}.
+4. It must read like the person in the brand profile wrote it, not like AI.
 
-OUTPUT:
-Provide ONLY the completed LinkedIn post, ready to publish. No explanations, no meta-commentary, no "here's the post:" prefix. Just the post text."""
+{OUTPUT_ONLY}"""
 
 
-def build_newsjack_prompt(
-    news_item: dict,
-    template: PostTemplate,
-    tone: str = "authoritative",
-    performance_context: str = "",
-) -> str:
-    """Build a prompt for sharing news/trends as a clean summary for LinkedIn."""
-    performance_section = ""
-    if performance_context:
-        performance_section = f"\n{performance_context}\n"
+def build_news_summary_prompt(topic: str, title: str, content: str, source: str = "", url: str = "") -> str:
+    """User message for a curated news-summary post from a research item."""
+    item = f"Topic: {topic}\nTitle: {title}\nSource: {source}\nURL: {url}\n\n{content}"
+    return f"""Write a LinkedIn post that shares this news with the audience in the brand profile.
 
-    return f"""{BRAND_PERSONA}
+{untrusted(item, "news")}
 
-{VIRALITY_RULES}
-{performance_section}
-NEWS/TREND TO SHARE:
-Title: {news_item.get('title', '')}
-Summary: {news_item.get('content', '')}
-Source: {news_item.get('source', '')}
+RULES FOR THIS POST:
+1. Open with a plain statement of what happened (not about the author).
+2. Give 3–4 key takeaways as short lines starting with "→".
+3. Add 1–2 sentences on why it matters for {get_niche()}.
+4. You are curating news: no "I", no "my agency", no invented experiences.
+5. Close with a specific question about the news. Do not include the URL in the body.
 
-YOUR TASK:
-Write a LinkedIn post that SHARES this news/trend with your audience. You are sharing news — NOT telling a personal story.
-
-RULES FOR NEWS POSTS:
-1. Open with a scroll-stopping hook about the news itself (NOT about you or your experience).
-2. Summarize the key points in clear BULLET POINTS so people can scan quickly.
-3. Use → or - for bullet points. Each bullet should be one key takeaway from the story.
-4. Keep bullets concise — one line each, no fluff.
-5. After the bullets, add 1-2 lines on why this matters for your audience (e-commerce founders, DTC brands, marketers).
-6. Do NOT say "I did this" or "at my agency" or relate this to personal experience.
-7. You are a news curator sharing valuable information — that's it.
-8. End with a question about the news topic to drive comments.
-
-STRUCTURE:
-[Scroll-stopping hook about the news]
-
-[Blank line]
-
-Key takeaways:
-
-→ [Bullet point 1]
-→ [Bullet point 2]
-→ [Bullet point 3]
-→ [Bullet point 4] (if needed)
-
-[Blank line]
-
-[1-2 lines on why this matters for e-commerce/marketing professionals]
-
-[Blank line]
-
-[Question to drive discussion]
-
-OUTPUT:
-Provide ONLY the completed LinkedIn post. No explanations."""
+{OUTPUT_ONLY}"""
 
 
-def build_news_summary_prompt(
-    topic: str,
-    title: str,
-    content: str,
-    source: str = "",
-    url: str = "",
-) -> str:
-    """Build a prompt for creating a news summary post from a research item."""
-    source_line = f"\nSource: {source}" if source else ""
-    url_line = f"\nURL: {url}" if url else ""
-
-    return f"""{BRAND_PERSONA}
-
-{VIRALITY_RULES}
-
-NEWS/RESEARCH TO SHARE:
-Topic: {topic}
-Title: {title}
-Content: {content}{source_line}{url_line}
-
-YOUR TASK:
-Write a LinkedIn post that SUMMARIZES this news/research for your audience. You are sharing information — NOT telling a personal story about yourself.
-
-RULES:
-1. Hook: A bold, scroll-stopping statement about the news (NOT about you).
-2. Body: Summarize the key points in BULLET POINTS using → symbols.
-3. Each bullet = one clear takeaway. Keep them scannable and concise.
-4. Do NOT relate this to your personal experience or agency work.
-5. Do NOT say "I", "my agency", "we helped", or reference any specific company.
-6. You are curating and sharing — like a news anchor, not a storyteller.
-7. After the bullets, add 1-2 lines on why this matters for e-commerce/marketing professionals.
-8. End with a discussion question about the topic.
-9. No hashtags. No emojis except where genuinely useful.
-10. 150-250 words.
-
-STRUCTURE EXAMPLE:
-[Bold hook about the news]
-
-Key takeaways:
-
-→ [Point 1]
-→ [Point 2]
-→ [Point 3]
-→ [Point 4]
-
-Why this matters for e-commerce brands: [1-2 sentences]
-
-[Discussion question]
-
-OUTPUT:
-Provide ONLY the completed LinkedIn post. No explanations, no prefixes. Just the post."""
+IDEA_VARIANTS = {
+    "actionable": "Make it actionable: give concrete steps, tactics or a framework the reader can use today.",
+    "storytelling": "Tell a story: start at a specific moment, build tension, land one clear lesson.",
+    "thought-provoking": "Challenge conventional thinking with one surprising, well-argued insight.",
+    "contrarian": "Take a contrarian stance against a common industry belief, and back it up.",
+    "vulnerable": "Share a real mistake or struggle, stated plainly, and what changed after it.",
+    "data-driven": "Lead with data: numbers, benchmarks and results that make the point hard to argue with.",
+}
 
 
 def build_idea_prompt(
@@ -264,99 +126,40 @@ def build_idea_prompt(
     structures: list[str] | None = None,
     performance_context: str = "",
 ) -> str:
-    """Build a Claude prompt to turn a raw idea into a polished LinkedIn post."""
-    format_str = ", ".join(formats) if formats else "concise"
-    tone_str = ", ".join(tones) if tones else "friendly"
-    angle_str = ", ".join(angles) if angles else "story"
+    """User message turning a raw idea into a post."""
     structure_str = ", ".join(structures) if structures else "AIDA"
+    return f"""Turn this idea into one LinkedIn post.
 
-    variant_instructions = {
-        "actionable": "Make it highly actionable — give the reader concrete steps, tactics, or a framework they can use TODAY.",
-        "storytelling": "Tell a compelling story — use narrative arc, tension, and a clear lesson. Start with a moment, not a statement.",
-        "thought-provoking": "Challenge conventional thinking — present a surprising insight or question that makes people pause and reconsider.",
-        "contrarian": "Take a bold contrarian stance — argue against something the industry commonly believes. Be provocative but back it up.",
-        "vulnerable": "Be genuinely vulnerable — share a real failure, mistake, or struggle. Show the messy behind-the-scenes.",
-        "data-driven": "Lead with data and numbers — use statistics, benchmarks, results, and specifics to make your point irrefutable.",
-    }
-
-    variant_text = variant_instructions.get(variant, variant_instructions["actionable"])
-
-    performance_section = ""
-    if performance_context:
-        performance_section = f"\n{performance_context}\n"
-
-    return f"""{BRAND_PERSONA}
-
-{VIRALITY_RULES}
-{performance_section}
-YOUR IDEA:
----
+IDEA:
 {idea}
----
 
-VARIATION STYLE: {variant}
-{variant_text}
-
-FORMAT PREFERENCES: {format_str}
-TONE: {tone_str}
-ANGLE: {angle_str}
-COPYWRITING STRUCTURE: {structure_str}
-
-STRUCTURE GUIDE:
-- AIDA = Attention, Interest, Desire, Action
-- PAS = Problem, Agitation, Solution
-- BAB = Before, After, Bridge
-- PPP = Problem, Promise, Proof
-
-INSTRUCTIONS:
-1. Take the raw idea above and turn it into a polished, viral LinkedIn post.
-2. Follow the {structure_str} copywriting structure.
-3. Use a {tone_str} tone and a {angle_str} angle.
-4. Format: {format_str} — adapt the post length and style accordingly.
-5. The first line MUST be a scroll-stopper.
-6. Make it sound like a real person sharing a real insight — NOT like AI-generated content.
-7. Include specific, concrete details and numbers where appropriate.
-8. End with an engagement driver (question, agree/disagree, or share prompt).
-
-OUTPUT:
-Provide ONLY the completed LinkedIn post, ready to publish. No explanations, no meta-commentary. Just the post text."""
+VARIATION: {variant} — {IDEA_VARIANTS.get(variant, IDEA_VARIANTS["actionable"])}
+FORMAT: {", ".join(formats) if formats else "concise"}
+TONE: {", ".join(tones) if tones else "friendly"}
+ANGLE: {", ".join(angles) if angles else "story"}
+COPY STRUCTURE: {structure_str} (AIDA = attention, interest, desire, action; PAS = problem, agitation, solution; BAB = before, after, bridge; PPP = problem, promise, proof)
+{_section("WHAT HAS WORKED FOR THIS ACCOUNT:", performance_context)}
+{OUTPUT_ONLY}"""
 
 
-def build_regeneration_prompt(
-    original_post: str,
-    template_name: str,
-    rejection_reason: str = "",
-    feedback: str = "",
-) -> str:
-    """Build a prompt to regenerate a rejected post with improvements."""
-    feedback_section = ""
+def build_regeneration_prompt(original_post: str, template_name: str, rejection_reason: str = "", feedback: str = "") -> str:
+    """User message to rewrite a rejected post."""
+    notes = ""
     if rejection_reason:
-        feedback_section += f"\nREJECTION REASON: {rejection_reason}"
+        notes += f"\nWhy it was rejected: {rejection_reason}"
     if feedback:
-        feedback_section += f"\nUSER FEEDBACK: {feedback}"
+        notes += f"\nUser feedback: {feedback}"
+    return f"""Rewrite this LinkedIn post so it is clearly better and noticeably different (not a light edit).
 
-    return f"""{BRAND_PERSONA}
-
-{VIRALITY_RULES}
-
-The following LinkedIn post was generated but needs to be rewritten:
-
-ORIGINAL POST:
+ORIGINAL POST (template: {template_name}):
 ---
 {original_post}
 ---
+{notes}
 
-Template used: {template_name}
-{feedback_section}
+Keep the topic and general structure unless the feedback says otherwise.
 
-INSTRUCTIONS:
-1. Rewrite this post addressing the feedback above.
-2. Keep the same general template structure and topic.
-3. Make it significantly different from the original — don't just tweak words.
-4. Ensure it follows all virality requirements.
-
-OUTPUT:
-Provide ONLY the rewritten LinkedIn post. No explanations."""
+{OUTPUT_ONLY}"""
 
 
 def build_recreate_prompt(
@@ -370,44 +173,20 @@ def build_recreate_prompt(
     engagement_stats: str = "",
     performance_context: str = "",
 ) -> str:
-    """Build a prompt to create an original post inspired by a competitor's viral post."""
-    analysis_section = ""
-    if why_it_works:
-        analysis_section += f"\nWHY THIS POST WORKED: {why_it_works}"
-    if how_to_recreate:
-        analysis_section += f"\nRECREATION GUIDE: {how_to_recreate}"
+    """User message for an original post inspired by a competitor's post."""
+    analysis = (f"Hook style: {hook_style or 'n/a'}\nFormat: {content_format or 'n/a'}\nTopic: {topic or 'n/a'}\n"
+                f"Engagement: {engagement_stats or 'n/a'}\nWhy it worked: {why_it_works or 'n/a'}\n"
+                f"Recreation notes: {how_to_recreate or 'n/a'}")
+    return f"""Write an ORIGINAL LinkedIn post inspired by the structure of a high-performing post by {competitor_name}.
 
-    performance_section = ""
-    if performance_context:
-        performance_section = f"\n{performance_context}\n"
+{untrusted(competitor_content, "competitor_post")}
 
-    return f"""{BRAND_PERSONA}
-
-{VIRALITY_RULES}
-{performance_section}
-You are creating an ORIGINAL LinkedIn post inspired by a high-performing competitor post.
-
-COMPETITOR POST ({competitor_name}):
----
-{competitor_content}
----
-
-COMPETITOR POST ANALYSIS:
-- Hook style: {hook_style or 'N/A'}
-- Content format: {content_format or 'N/A'}
-- Topic area: {topic or 'N/A'}
-- Engagement: {engagement_stats or 'N/A'}
-{analysis_section}
-
+ANALYSIS OF WHY IT WORKED:
+{analysis}
+{_section("WHAT HAS WORKED FOR THIS ACCOUNT:", performance_context)}
 INSTRUCTIONS:
-1. Study the competitor post's STRUCTURE and STYLE — what makes it engaging.
-2. Create a COMPLETELY ORIGINAL post on the same topic area but from YOUR perspective as an agency owner.
-3. Use the same hook style ({hook_style or 'bold statement'}) and content format ({content_format or 'list'}).
-4. Draw from YOUR experience helping e-commerce brands — use different examples, numbers, and stories.
-5. Do NOT copy any specific phrases, sentences, or examples from the competitor post.
-6. Match or exceed the engagement potential by applying what made their post work.
-7. Make it feel authentic — like YOU wrote it from your real agency experience.
-8. Include specific numbers and concrete details from your perspective.
+1. Borrow the hook style and structure, not the words: do not reuse any phrase, example or number from that post.
+2. Write from the brand profile's own perspective and niche ({get_niche()}).
+3. Use only real details from the brand profile; otherwise keep examples clearly general.
 
-OUTPUT:
-Provide ONLY the completed LinkedIn post, ready to publish. No explanations, no meta-commentary. Just the post text."""
+{OUTPUT_ONLY}"""

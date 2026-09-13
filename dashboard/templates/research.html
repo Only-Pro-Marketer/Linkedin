@@ -345,7 +345,7 @@
 
             <!-- Actions -->
             <div class="flex items-center gap-3 border-t border-gray-100 pt-4">
-                <a id="pcViewInQueue" href="/" class="btn btn-primary btn-md flex-1 text-center">View in Queue</a>
+                <a id="pcViewInQueue" href="/queue" class="btn btn-primary btn-md flex-1 text-center">View in Queue</a>
                 <button onclick="closePostCreatedModal()" class="btn btn-ghost btn-md flex-1">Close</button>
             </div>
         </div>
@@ -1768,9 +1768,9 @@ function bindMapEvents() {
             const vel = VEL_ICON[n.velocity] || '';
             const catLabel = n.category.replace(/_/g, ' ');
             tooltip.innerHTML =
-                `<strong style="font-size:13px;">${n.label}</strong><br>` +
-                `<span style="opacity:0.7;">${catLabel}</span> &middot; ` +
-                `<span style="opacity:0.7;">${n.source}</span><br>` +
+                `<strong style="font-size:13px;">${esc(n.label)}</strong><br>` +
+                `<span style="opacity:0.7;">${esc(catLabel)}</span> &middot; ` +
+                `<span style="opacity:0.7;">${esc(n.source)}</span><br>` +
                 `Relevance: <strong>${(n.relevance * 100).toFixed(0)}%</strong> ${vel}<br>` +
                 (n.count > 1 ? `Seen ${n.count}x &middot; ` : '') +
                 (n.used ? '<span style="color:#30d158;">Used</span> ' : '') +
@@ -1852,8 +1852,8 @@ function selectNode(n) {
     const velLabel = n.velocity ? n.velocity.charAt(0).toUpperCase() + n.velocity.slice(1) : '';
     document.getElementById('detail-body').innerHTML =
         `<div style="display:grid; grid-template-columns:1fr 1fr; gap:6px 12px; margin-bottom:8px;">` +
-        `<div><span style="font-size:11px;color:var(--text-muted);">Category</span><br><strong>${catLabel}</strong></div>` +
-        `<div><span style="font-size:11px;color:var(--text-muted);">Source</span><br><strong>${n.source}</strong></div>` +
+        `<div><span style="font-size:11px;color:var(--text-muted);">Category</span><br><strong>${esc(catLabel)}</strong></div>` +
+        `<div><span style="font-size:11px;color:var(--text-muted);">Source</span><br><strong>${esc(n.source)}</strong></div>` +
         `<div><span style="font-size:11px;color:var(--text-muted);">Relevance</span><br><strong>${(n.relevance * 100).toFixed(0)}%</strong></div>` +
         `<div><span style="font-size:11px;color:var(--text-muted);">Velocity</span><br><strong>${vel} ${velLabel}</strong></div>` +
         `</div>` +
@@ -1876,7 +1876,7 @@ function selectNode(n) {
             const nd = nMap[id];
             if (!nd) return '';
             const col = CAT_COLORS[nd.category] || '#9CA3AF';
-            return `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;background:${col}18;color:${col};border:1px solid ${col}30;cursor:pointer;" onclick="selectNodeById('${id}')">${nd.label.slice(0,25)}</span>`;
+            return `<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;background:${col}18;color:${col};border:1px solid ${col}30;cursor:pointer;" onclick="selectNodeById('${esc(id)}')">${esc(nd.label.slice(0,25))}</span>`;
         }).join(' ');
         document.getElementById('detail-body').innerHTML += `<div style="margin-top:8px;"><span style="font-size:11px;color:var(--text-muted);">Connected topics</span><div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px;">${tags}</div></div>`;
     }

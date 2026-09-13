@@ -135,6 +135,7 @@ class ContentStrategy:
         plans = []
         used_templates_this_batch = []
         used_tones_this_batch = []
+        taken_research_ids: set[int] = set()
 
         for i in range(count):
             template = self._select_template(
@@ -148,8 +149,8 @@ class ContentStrategy:
                 if others:
                     template = random.choice(others)
 
-            topic, research_context = self._select_topic(
-                unused_research, recent_topics, i
+            topic, research_context, research_item = self._select_topic(
+                unused_research, taken_research_ids
             )
 
             # Content mix: ensure at least 1 personal story per batch of 5
@@ -161,6 +162,7 @@ class ContentStrategy:
                 if not has_story:
                     topic = "agency lessons and founder stories"
                     research_context = ""
+                    research_item = None
 
             tone = self._select_tone(used_tones_this_batch)
             angle = self._select_angle(template, tone)
@@ -172,14 +174,14 @@ class ContentStrategy:
                     "tone": tone,
                     "angle": angle,
                     "research_context": research_context,
+                    # Marked used only once the post is saved (see generator)
+                    "research_item_id": research_item.id if research_item else None,
                 }
             )
 
             used_templates_this_batch.append(template.name)
             used_tones_this_batch.append(tone)
 
-        # Batch commit research items marked as used
-        self.db.commit()
         return plans
 
     def _select_template(
@@ -212,7 +214,10 @@ class ContentStrategy:
             for insight in template_insights:
                 evidence = insight.get("evidence", {})
                 if evidence.get("template") == t.name:
-                    ratio = evidence.get("ratio", 1.0)
+                    ratio = evidence.get("ratio")
+                    if ratio is None:
+                        avg, overall = evidence.get("avg_score", 0), evidence.get("overall_avg", 0)
+                        ratio = avg / overall if overall > 0 and avg > 0 else 1.0
                     if ratio > 1.0:
                         weight *= 1.0 + (ratio - 1.0) * 0.5  # Moderate boost
                     elif ratio < 1.0:
@@ -229,24 +234,22 @@ class ContentStrategy:
     def _select_topic(
         self,
         research_items: list[ResearchItem],
-        recent_topics: list[str],
-        index: int,
-    ) -> tuple[str, str]:
-        """Select a topic — prefer unused research, fall back to category rotation."""
-        # Try unused research first
-        unused = [r for r in research_items if not r.used]
-        if unused:
-            item = unused[min(index, len(unused) - 1)]
-            item.used = True
-            # Commit is deferred — caller (plan_next_posts) should commit after batch
-            return item.topic, f"Source: {item.source}\nTitle: {item.title}\n{item.content[:500]}"
+        taken_ids: set[int],
+    ) -> tuple[str, str, ResearchItem | None]:
+        """Select a topic — prefer the best unused research item, else a category."""
+        available = [r for r in research_items if not r.used and r.id not in taken_ids]
+        if available:
+            item = available[0]  # list is already sorted by relevance
+            taken_ids.add(item.id)
+            context = f"Source: {item.source}\nTitle: {item.title or ''}\n{(item.content or '')[:500]}"
+            return item.topic or item.title or "industry news", context, item
 
         # Fall back to weighted random selection from topic categories
         weights = [TOPIC_WEIGHTS.get(cat, 1.0) for cat in TOPIC_CATEGORIES]
         total = sum(weights)
         weights = [w / total for w in weights]
         category = random.choices(TOPIC_CATEGORIES, weights=weights, k=1)[0]
-        return category, ""
+        return category, "", None
 
     def _select_tone(self, used_this_batch: list[str]) -> str:
         """Rotate through tones, avoiding repeats. Uses learning insights for weighting."""

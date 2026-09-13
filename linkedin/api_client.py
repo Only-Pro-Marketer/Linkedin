@@ -7,9 +7,14 @@ from urllib.parse import quote
 
 import httpx
 
+from config import settings
+
 logger = logging.getLogger(__name__)
 
-LINKEDIN_VERSION = "202601"
+LINKEDIN_VERSION = settings.LINKEDIN_API_VERSION
+
+IMAGE_CONTENT_TYPES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                       ".gif": "image/gif", ".webp": "image/webp"}
 REST_BASE = "https://api.linkedin.com/rest"
 V2_BASE = "https://api.linkedin.com/v2"
 
@@ -25,8 +30,18 @@ class LinkedInAPIClient:
     # Escaping them prevents silent truncation — matches Postiz's fixText().
     _ESCAPE_CHARS = ['\\', '<', '>', '#', '~', '_', '|', '[', ']', '*', '(', ')', '{', '}', '@']
 
-    def __init__(self, access_token: str):
+    def __init__(self, access_token: str, transport: httpx.AsyncBaseTransport | None = None):
         self.access_token = access_token
+        self._transport = transport  # tests inject httpx.MockTransport
+
+    def _client(self) -> httpx.AsyncClient:
+        return httpx.AsyncClient(transport=self._transport) if self._transport else httpx.AsyncClient()
+
+    async def _text_fallback(self, person_urn: str, commentary: str) -> dict:
+        """Media upload failed: publish as text and flag it for the dashboard."""
+        result = await self.create_text_post(person_urn, commentary)
+        result["media_fallback"] = True
+        return result
 
     def _escape_for_linkedin(self, text: str) -> str:
         """Escape special chars that LinkedIn interprets as formatting.
@@ -79,7 +94,7 @@ class LinkedInAPIClient:
             "isReshareDisabledByAuthor": False,
         }
 
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             response = await client.post(
                 f"{REST_BASE}/posts",
                 json=payload,
@@ -136,10 +151,10 @@ class LinkedInAPIClient:
         file_path = Path("dashboard" + image_path)
         if not file_path.exists():
             logger.warning("Image file not found: %s — falling back to text post", file_path)
-            return await self.create_text_post(person_urn, commentary)
+            return await self._text_fallback(person_urn, commentary)
 
         image_bytes = file_path.read_bytes()
-        content_type = "image/png" if file_path.suffix == ".png" else "image/jpeg"
+        content_type = IMAGE_CONTENT_TYPES.get(file_path.suffix.lower(), "image/jpeg")
 
         # Step 1: Initialize upload via REST API
         init_payload = {
@@ -147,7 +162,7 @@ class LinkedInAPIClient:
                 "owner": person_urn,
             }
         }
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             init_resp = await client.post(
                 f"{REST_BASE}/images?action=initializeUpload",
                 json=init_payload,
@@ -161,7 +176,7 @@ class LinkedInAPIClient:
                     init_resp.status_code,
                     init_resp.text,
                 )
-                return await self.create_text_post(person_urn, commentary)
+                return await self._text_fallback(person_urn, commentary)
 
             try:
                 init_data = init_resp.json()
@@ -169,7 +184,7 @@ class LinkedInAPIClient:
                 image_urn = init_data["value"]["image"]
             except (ValueError, KeyError) as e:
                 logger.warning("Image upload init returned invalid data: %s", e)
-                return await self.create_text_post(person_urn, commentary)
+                return await self._text_fallback(person_urn, commentary)
 
             # Step 2: Upload the image binary
             upload_headers = {
@@ -189,7 +204,7 @@ class LinkedInAPIClient:
                     upload_resp.status_code,
                     upload_resp.text,
                 )
-                return await self.create_text_post(person_urn, commentary)
+                return await self._text_fallback(person_urn, commentary)
 
             # Step 3: Create post with the image
             commentary = self._escape_for_linkedin(commentary)
@@ -270,7 +285,7 @@ class LinkedInAPIClient:
         file_path = Path("dashboard" + video_path)
         if not file_path.exists():
             logger.warning("Video file not found: %s — falling back to text post", file_path)
-            return await self.create_text_post(person_urn, commentary)
+            return await self._text_fallback(person_urn, commentary)
 
         video_bytes = file_path.read_bytes()
         file_size = len(video_bytes)
@@ -285,7 +300,7 @@ class LinkedInAPIClient:
                 "uploadThumbnail": False,
             }
         }
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             init_resp = await client.post(
                 f"{REST_BASE}/videos?action=initializeUpload",
                 json=init_payload,
@@ -299,7 +314,7 @@ class LinkedInAPIClient:
                     init_resp.status_code,
                     init_resp.text,
                 )
-                return await self.create_text_post(person_urn, commentary)
+                return await self._text_fallback(person_urn, commentary)
 
             try:
                 init_data = init_resp.json()
@@ -307,7 +322,7 @@ class LinkedInAPIClient:
                 video_urn = init_data["value"]["video"]
             except (ValueError, KeyError, IndexError) as e:
                 logger.warning("Video upload init returned invalid data: %s", e)
-                return await self.create_text_post(person_urn, commentary)
+                return await self._text_fallback(person_urn, commentary)
 
             # Step 2: Upload video binary
             content_type = {
@@ -334,13 +349,13 @@ class LinkedInAPIClient:
                     upload_resp.status_code,
                     upload_resp.text,
                 )
-                return await self.create_text_post(person_urn, commentary)
+                return await self._text_fallback(person_urn, commentary)
 
             # Step 3: Wait for LinkedIn to finish processing the video
             ready = await self._wait_for_video_ready(client, video_urn)
             if not ready:
                 logger.warning("Video processing timed out — falling back to text post")
-                return await self.create_text_post(person_urn, commentary)
+                return await self._text_fallback(person_urn, commentary)
 
             # Step 4: Create post with the video
             commentary = self._escape_for_linkedin(commentary)
@@ -432,7 +447,7 @@ class LinkedInAPIClient:
     async def get_post(self, post_urn: str) -> dict | None:
         """Retrieve a post by its URN."""
         encoded_urn = quote(post_urn, safe="")
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             response = await client.get(
                 f"{REST_BASE}/posts/{encoded_urn}",
                 headers=self._rest_headers(),
@@ -453,7 +468,7 @@ class LinkedInAPIClient:
         start = 0
         batch = min(count, 50)  # LinkedIn max per page is 50
 
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             while start < count:
                 params = {
                     "author": person_urn,
@@ -510,7 +525,7 @@ class LinkedInAPIClient:
         """
         encoded = quote(post_urn, safe="")
 
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             # Try socialMetadata first (single call)
             meta_resp = await client.get(
                 f"{REST_BASE}/socialMetadata/{encoded}",
@@ -553,7 +568,7 @@ class LinkedInAPIClient:
     async def delete_post(self, post_urn: str) -> bool:
         """Delete a post by its URN."""
         encoded_urn = quote(post_urn, safe="")
-        async with httpx.AsyncClient() as client:
+        async with self._client() as client:
             response = await client.delete(
                 f"{REST_BASE}/posts/{encoded_urn}",
                 headers=self._rest_headers(),
@@ -566,3 +581,72 @@ class LinkedInAPIClient:
                 "Failed to delete post %s: %s", post_urn, response.status_code
             )
             return False
+
+    # ── Comments & reactions (Engage) ─────────────────────────
+
+    async def _send(self, url: str, payload: dict) -> dict:
+        """POST and classify the outcome.
+
+        outcome: "ok"; "error" (LinkedIn answered with an error); "not_sent"
+        (never reached LinkedIn, safe to retry); "unknown" (sent, no answer:
+        it may have gone through, so never retry automatically).
+        """
+        try:
+            async with self._client() as client:
+                r = await client.post(url, json=payload, headers=self._rest_headers(), timeout=30.0)
+        except (httpx.ConnectError, httpx.ConnectTimeout) as e:
+            return {"success": False, "status_code": None, "outcome": "not_sent",
+                    "error": f"Couldn't reach LinkedIn ({type(e).__name__})"}
+        except httpx.HTTPError as e:
+            return {"success": False, "status_code": None, "outcome": "unknown",
+                    "error": f"No answer from LinkedIn ({type(e).__name__})"}
+        try:
+            body = r.json() if r.content else {}
+        except ValueError:
+            body = {}
+        ok = r.status_code in (200, 201)
+        if not ok:
+            logger.warning("LinkedIn %s -> %s: %s", url.split("?")[0], r.status_code, r.text[:300])
+        return {"success": ok, "status_code": r.status_code, "outcome": "ok" if ok else "error",
+                "restli_id": r.headers.get("x-restli-id", ""), "retry_after": r.headers.get("retry-after"),
+                "body": body if isinstance(body, dict) else {}, "error": "" if ok else r.text[:500]}
+
+    async def create_comment(self, actor: str, object_urn: str, text: str,
+                             parent_comment: str | None = None) -> dict:
+        """Comment on a post, or reply under a TOP-level comment (parent_comment).
+
+        POST /rest/socialActions/{target}/comments — target is the post, or the
+        parent comment for a reply. Adds "comment_urn" on success.
+        """
+        target = parent_comment or object_urn
+        payload = {"actor": actor, "object": object_urn, "message": {"text": text}}
+        if parent_comment:
+            payload["parentComment"] = parent_comment
+        result = await self._send(f"{REST_BASE}/socialActions/{quote(target, safe='')}/comments", payload)
+        if result["success"]:
+            body = result["body"]
+            urn = body.get("commentUrn") or body.get("$URN") or result["restli_id"]
+            if urn and not urn.startswith("urn:"):
+                urn = f"urn:li:comment:({object_urn},{urn})"
+            result["comment_urn"] = urn or None
+        return result
+
+    async def create_reaction(self, actor: str, root_urn: str, reaction_type: str = "LIKE") -> dict:
+        """React to a post or comment (root_urn) as the member."""
+        return await self._send(f"{REST_BASE}/reactions?actor={quote(actor, safe='')}",
+                                {"root": root_urn, "reactionType": reaction_type})
+
+    async def userinfo(self) -> dict:
+        """OpenID userinfo for the token's owner (Settings → Test connection)."""
+        try:
+            async with self._client() as client:
+                r = await client.get(f"{V2_BASE}/userinfo",
+                                     headers={"Authorization": f"Bearer {self.access_token}"}, timeout=15.0)
+        except httpx.HTTPError as e:
+            return {"status_code": None, "body": {}, "error": type(e).__name__}
+        ok = r.status_code == 200
+        try:
+            body = r.json() if ok else {}
+        except ValueError:
+            body = {}
+        return {"status_code": r.status_code, "body": body, "error": "" if ok else r.text[:300]}

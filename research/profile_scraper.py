@@ -4,11 +4,12 @@ import logging
 import re
 from datetime import datetime
 
-from apify_client import ApifyClient
 from sqlalchemy.orm import Session
 
-from config import settings, get_anthropic_client
+import llm
+from config import settings
 from database.models import MyLinkedInPost
+from research.apify_linkedin import NO_TOKEN, ApifyError, available, run_actor_items
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,6 @@ class ProfileScraper:
 
     def __init__(self, db: Session):
         self.db = db
-        self.apify = ApifyClient(settings.APIFY_TOKEN)
-        self.claude = get_anthropic_client()
 
     def scrape_my_profile(self, profile_url: str | None = None) -> dict:
         """Run a full scrape of the user's LinkedIn profile and posts.
@@ -65,13 +64,19 @@ class ProfileScraper:
             "analyzed": 0,
         }
 
-        # 1. Fetch profile data
+        if not available():
+            return {"error": NO_TOKEN}
+
+        # 1. Fetch profile data (extras only; failures are logged)
         profile_data = self._fetch_profile(full_url)
         if profile_data:
             result["profile"] = profile_data
 
         # 2. Fetch posts
-        new, updated = self._fetch_posts(full_url)
+        try:
+            new, updated = self._fetch_posts(full_url)
+        except ApifyError as e:
+            return {"error": str(e)}
         result["new_posts"] = new
         result["updated_posts"] = updated
 
@@ -91,12 +96,7 @@ class ProfileScraper:
     def _fetch_profile(self, profile_url: str) -> dict:
         """Fetch profile info via Apify."""
         try:
-            run = self.apify.actor(PROFILE_ACTOR).call(
-                run_input={"profileUrls": [profile_url]},
-                timeout_secs=120,
-            )
-            dataset = self.apify.dataset(run["defaultDatasetId"])
-            items = list(dataset.iterate_items())
+            items = run_actor_items(PROFILE_ACTOR, {"profileUrls": [profile_url]}, timeout_s=120)
 
             if not items:
                 logger.warning("No profile data returned for %s", profile_url)
@@ -116,19 +116,12 @@ class ProfileScraper:
 
     def _fetch_posts(self, profile_url: str) -> tuple[int, int]:
         """Fetch posts via Apify and store/update them."""
+        items = run_actor_items(  # raises ApifyError so the caller can show why
+            POSTS_ACTOR,
+            {"targetUrls": [profile_url], "maxPosts": 50, "scrapeReactions": False, "scrapeComments": False},
+            timeout_s=240,
+        )
         try:
-            run = self.apify.actor(POSTS_ACTOR).call(
-                run_input={
-                    "targetUrls": [profile_url],
-                    "maxPosts": 50,
-                    "scrapeReactions": False,
-                    "scrapeComments": False,
-                },
-                timeout_secs=240,
-            )
-            dataset = self.apify.dataset(run["defaultDatasetId"])
-            items = list(dataset.iterate_items())
-
             if not items:
                 logger.warning("No posts returned for %s", profile_url)
                 return 0, 0
@@ -247,12 +240,9 @@ class ProfileScraper:
 
     def _analyze_post(self, post: MyLinkedInPost):
         """Analyze a single post with Claude."""
-        prompt = f"""Analyze this LinkedIn post and provide a structured breakdown.
+        prompt = f"""Analyze this LinkedIn post (written by the account owner) and give a structured breakdown.
 
-POST CONTENT:
----
-{post.content}
----
+{llm.untrusted(post.content, "own_post")}
 
 ENGAGEMENT: {post.likes} likes, {post.comments} comments, {post.shares} shares
 
@@ -265,13 +255,7 @@ KEY_TAKEAWAY: [the core insight, 1-2 sentences]
 WHY_IT_WORKS: [why this post performed well or poorly — specific analysis, 2-3 sentences]"""
 
         try:
-            message = self.claude.messages.create(
-                model=settings.CLAUDE_MODEL,
-                max_tokens=600,
-                temperature=0.3,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result = message.content[0].text.strip()
+            result = llm.complete("profile_analysis", prompt, brand=False, effort="low", max_tokens=3000).text
 
             fields = {}
             for line in result.split("\n"):

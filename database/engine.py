@@ -1,11 +1,14 @@
 """Database connection and initialization."""
 
+import logging
 import sqlite3
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, Session
 from database.models import Base
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 engine = create_engine(
     settings.DATABASE_URL,
@@ -13,6 +16,16 @@ engine = create_engine(
     echo=False,
     pool_pre_ping=True,
 )
+
+
+@event.listens_for(engine, "connect")
+def _sqlite_pragmas(dbapi_conn, _record):
+    """WAL + busy timeout: routes (thread pool) and jobs write concurrently."""
+    if settings.DATABASE_URL.startswith("sqlite"):
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA busy_timeout=5000")
+        cur.close()
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
@@ -36,7 +49,7 @@ def _migrate_research_columns():
         conn.commit()
         conn.close()
     except Exception:
-        pass  # Table will be created fresh by create_all
+        logger.exception("Legacy migration step failed")
 
 
 def _migrate_video_columns():
@@ -74,7 +87,7 @@ def _migrate_video_columns():
         conn.commit()
         conn.close()
     except Exception:
-        pass
+        logger.exception("Legacy migration step failed")
 
 
 def _migrate_learning_columns():
@@ -90,7 +103,7 @@ def _migrate_learning_columns():
         conn.commit()
         conn.close()
     except Exception:
-        pass
+        logger.exception("Legacy migration step failed")
 
 
 def _migrate_research_hub_columns():
@@ -126,7 +139,7 @@ def _migrate_research_hub_columns():
         conn.commit()
         conn.close()
     except Exception:
-        pass
+        logger.exception("Legacy migration step failed")
 
 
 def _migrate_autoresearch_tables():
@@ -178,7 +191,7 @@ def _migrate_autoresearch_tables():
         conn.commit()
         conn.close()
     except Exception:
-        pass
+        logger.exception("Legacy migration step failed")
 
 
 def _migrate_commenting_columns():
@@ -197,7 +210,7 @@ def _migrate_commenting_columns():
         conn.commit()
         conn.close()
     except Exception:
-        pass
+        logger.exception("Legacy migration step failed")
 
 
 def _migrate_recycled_column():
@@ -213,7 +226,7 @@ def _migrate_recycled_column():
         conn.commit()
         conn.close()
     except Exception:
-        pass
+        logger.exception("Legacy migration step failed")
 
 
 def _seed_content_calendar():
@@ -256,6 +269,11 @@ def init_database():
     _migrate_autoresearch_tables()
     _migrate_recycled_column()
     _migrate_commenting_columns()
+
+    from database.migrations import run_migrations
+    db_path = settings.DATABASE_URL.replace("sqlite:///", "") if settings.DATABASE_URL.startswith("sqlite") else None
+    run_migrations(engine, db_path)
+
     _seed_content_calendar()
 
 

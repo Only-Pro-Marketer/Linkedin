@@ -1,77 +1,42 @@
-"""Comment helper — assists with strategic commenting on industry leaders' posts.
+"""Comment helper — surfaces competitor posts worth commenting on and drafts comments.
 
-Strategic commenting (10-15 thoughtful comments/day) is the #1 growth lever
-for LinkedIn in 2025-2026. Comments are 15x more valuable than reactions.
-This module helps by surfacing target posts and drafting value-adding comments.
+Thoughtful comments on other people's posts are one of the strongest growth
+levers on LinkedIn. Drafts follow the comment playbook in knowledge/.
 """
 
 import logging
 from datetime import datetime, timedelta
-from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from config import settings, get_anthropic_client
+import llm
 from database.models import Competitor, CompetitorPost
-
-# Load soul.md for brand-aware commenting
-_SOUL_PATH = Path(__file__).resolve().parent.parent / "soul" / "soul.md"
-_soul_content = ""
-if _SOUL_PATH.exists():
-    _soul_content = _SOUL_PATH.read_text(encoding="utf-8")
 
 logger = logging.getLogger(__name__)
 
-COMMENT_DRAFT_PROMPT = """You are writing a thoughtful comment on someone else's LinkedIn post to build genuine engagement and visibility.
+DAILY_TARGET = 15
 
-Write from the perspective described in this brand profile:
----
-{soul_context}
----
+COMMENT_RULES = """You write comments on other people's LinkedIn posts for the author in <brand_voice>, following comment-templates.md and voice-rules.md.
 
-THE POST YOU ARE COMMENTING ON:
----
-{post_content}
----
-
-Author: {author_name}
-Topic area: {topic}
-
-WRITE A COMMENT THAT:
-1. References a SPECIFIC point from the post (not generic "great post!" praise)
-2. Adds genuine value — share a relevant experience, data point, or insight from your work
-3. Is 2-4 sentences long (long enough to trigger dwell time, short enough to not hijack)
-4. Ends with a question or insight that invites further discussion
-5. Sounds authentic to the brand voice described above
-6. Does NOT sell or self-promote — pure value addition
-
-BAD EXAMPLES (never write these):
-- "Great post! Totally agree."
-- "This is so true! Check out my company for more."
-- "Love this! We do the same thing."
-
-GOOD EXAMPLE STYLE:
-"Interesting point about email frequency. We tested this across 12 accounts last quarter — the sweet spot varied significantly by industry. The product consideration cycle seems to matter more than the industry average suggests. Have you seen similar patterns?"
-
-OUTPUT:
-Provide ONLY the comment text. No quotes, no explanations."""
+A good comment:
+- is 200–350 characters, in 1–2 short paragraphs;
+- reacts to one specific point from the post (never "Great post!");
+- adds one sharp insight, experience or data point the post did not cover;
+- ends with a genuine question or a sharper angle that invites a reply;
+- never pitches or names the author's own product;
+- capitalises names, uses no hashtags.
+Output only the comment text."""
 
 
 class CommentHelper:
-    """Assists with strategic commenting on competitor/industry leader posts."""
+    """Assists with strategic commenting on competitor / industry-leader posts."""
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = get_anthropic_client()
 
-    def get_daily_targets(self, count: int = 15) -> list[dict]:
-        """Get high-engagement competitor posts worth commenting on today.
-
-        Prioritizes: recent + high engagement + not yet commented on.
-        Returns list of dicts with post info and competitor name.
-        """
+    def get_daily_targets(self, count: int = DAILY_TARGET) -> list[dict]:
+        """Recent, high-engagement competitor posts not yet commented on."""
         seven_days_ago = datetime.utcnow() - timedelta(days=7)
-
         targets = (
             self.db.query(CompetitorPost, Competitor)
             .join(Competitor, CompetitorPost.competitor_id == Competitor.id)
@@ -79,15 +44,12 @@ class CommentHelper:
                 CompetitorPost.commented_at.is_(None),
                 CompetitorPost.content.isnot(None),
                 CompetitorPost.post_date >= seven_days_ago,
-                Competitor.is_active == True,
+                Competitor.is_active == True,  # noqa: E712
             )
-            .order_by(
-                (CompetitorPost.likes + CompetitorPost.comments * 3).desc()
-            )
-            .limit(count * 2)  # fetch extra for filtering
+            .order_by((CompetitorPost.likes + CompetitorPost.comments * 3).desc())
+            .limit(count * 2)
             .all()
         )
-
         results = []
         for cp, comp in targets:
             if not cp.content or len(cp.content.strip()) < 50:
@@ -107,53 +69,29 @@ class CommentHelper:
             })
             if len(results) >= count:
                 break
-
         return results
 
     def draft_comment(self, competitor_post_id: int) -> dict:
-        """Generate a thoughtful comment draft for a competitor post.
-
-        Returns dict with the draft or error.
-        """
+        """Generate a comment draft for a competitor post."""
         cp = self.db.query(CompetitorPost).filter(CompetitorPost.id == competitor_post_id).first()
         if not cp:
             return {"error": "Post not found"}
-
         comp = self.db.query(Competitor).filter(Competitor.id == cp.competitor_id).first()
-        author_name = comp.name if comp else "Unknown"
+        author_name = comp.name if comp else "the author"
 
-        prompt = COMMENT_DRAFT_PROMPT.format(
-            soul_context=_soul_content[:500] if _soul_content else "No brand profile configured",
-            post_content=cp.content[:2000],
-            author_name=author_name,
-            topic=cp.topic or "marketing / e-commerce",
-        )
-
+        user = (f"Write a comment on this post by {author_name}.\n\n"
+                f"{llm.untrusted(cp.content[:3000], 'linkedin_post')}")
         try:
-            message = self.client.messages.create(
-                model=settings.CLAUDE_MODEL,
-                max_tokens=300,
-                temperature=0.7,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            draft = message.content[0].text.strip()
-        except Exception as e:
-            logger.error("Failed to draft comment: %s", e)
-            return {"error": f"Generation failed: {e}"}
+            draft = llm.complete("comment_draft", user, packs=("comment",), instructions=COMMENT_RULES,
+                                 effort="medium", max_tokens=3000).text
+        except llm.LLMError as e:
+            return {"error": str(e)}
 
-        # Save draft to DB
         cp.comment_draft = draft
         self.db.commit()
-
-        return {
-            "post_id": competitor_post_id,
-            "draft": draft,
-            "author": author_name,
-            "post_url": cp.post_url,
-        }
+        return {"post_id": competitor_post_id, "draft": draft, "author": author_name, "post_url": cp.post_url}
 
     def mark_commented(self, competitor_post_id: int) -> bool:
-        """Mark a post as commented on."""
         cp = self.db.query(CompetitorPost).filter(CompetitorPost.id == competitor_post_id).first()
         if not cp:
             return False
@@ -162,30 +100,14 @@ class CommentHelper:
         return True
 
     def get_commenting_stats(self) -> dict:
-        """Get commenting activity stats."""
         today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
         this_week = today - timedelta(days=today.weekday())
-
-        today_count = (
-            self.db.query(CompetitorPost)
-            .filter(CompetitorPost.commented_at >= today)
-            .count()
-        )
-        week_count = (
-            self.db.query(CompetitorPost)
-            .filter(CompetitorPost.commented_at >= this_week)
-            .count()
-        )
-        total_count = (
-            self.db.query(CompetitorPost)
-            .filter(CompetitorPost.commented_at.isnot(None))
-            .count()
-        )
-
+        q = self.db.query(CompetitorPost)
+        today_count = q.filter(CompetitorPost.commented_at >= today).count()
         return {
             "today": today_count,
-            "this_week": week_count,
-            "total": total_count,
-            "daily_target": 15,
-            "today_remaining": max(0, 15 - today_count),
+            "this_week": q.filter(CompetitorPost.commented_at >= this_week).count(),
+            "total": q.filter(CompetitorPost.commented_at.isnot(None)).count(),
+            "daily_target": DAILY_TARGET,
+            "today_remaining": max(0, DAILY_TARGET - today_count),
         }

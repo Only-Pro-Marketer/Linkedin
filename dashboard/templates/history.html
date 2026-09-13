@@ -78,6 +78,9 @@
             <button onclick="switchTab('rejected')" id="tab-rejected" class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-all">
                 Rejected
             </button>
+            <button onclick="switchTab('failed')" id="tab-failed" class="tab-btn px-4 py-2 text-sm font-medium rounded-md transition-all">
+                Failed
+            </button>
         </div>
         <div class="flex items-center gap-3">
             <div class="relative">
@@ -187,6 +190,36 @@
                 </div>
             </div>
 
+            <!-- Manual stats (published posts) -->
+            <div id="view-stats-form" class="hidden mt-3 p-3 rounded-xl border border-gray-100">
+                <div class="flex items-center justify-between mb-2">
+                    <p class="text-xs font-semibold text-gray-600">Update numbers from LinkedIn</p>
+                    <span class="text-[11px] text-gray-400">Learnings and Analytics use these</span>
+                </div>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <label class="text-[11px] text-gray-500">Impressions<input type="number" min="0" id="stat-impressions" class="field-input" style="padding: 6px 10px;"></label>
+                    <label class="text-[11px] text-gray-500">Reactions<input type="number" min="0" id="stat-likes" class="field-input" style="padding: 6px 10px;"></label>
+                    <label class="text-[11px] text-gray-500">Comments<input type="number" min="0" id="stat-comments" class="field-input" style="padding: 6px 10px;"></label>
+                    <label class="text-[11px] text-gray-500">Reposts<input type="number" min="0" id="stat-shares" class="field-input" style="padding: 6px 10px;"></label>
+                </div>
+                <div class="flex justify-end mt-2"><button type="button" class="btn btn-primary btn-sm" onclick="saveStats(this)">Save numbers</button></div>
+            </div>
+            <script>
+            async function saveStats(btn) {
+                const form = document.getElementById('view-stats-form');
+                const num = (k) => Math.max(0, parseInt(document.getElementById('stat-' + k).value || '0', 10) || 0);
+                App.busy(btn, true, 'Saving…');
+                try {
+                    const r = await App.api(`/api/history/${form.dataset.postId}/stats`, { method: 'POST', body: {
+                        impressions: num('impressions'), likes: num('likes'), comments: num('comments'), shares: num('shares') } });
+                    document.getElementById('view-likes').textContent = r.likes;
+                    document.getElementById('view-comments').textContent = r.comments;
+                    document.getElementById('view-shares').textContent = r.shares;
+                    showToast('Numbers saved');
+                } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+            }
+            </script>
+
             <!-- Actions -->
             <div class="flex gap-2 justify-end mt-5 pt-4 border-t border-gray-100" id="view-actions"></div>
         </div>
@@ -260,7 +293,7 @@ let originalEditContent = '';
 document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams(window.location.search);
     const tab = params.get('tab');
-    if (['approved', 'rejected', 'posted'].includes(tab)) currentTab = tab;
+    if (['approved', 'rejected', 'posted', 'failed'].includes(tab)) currentTab = tab;
     switchTab(currentTab);
 });
 
@@ -276,7 +309,7 @@ function switchTab(tab) {
     document.querySelectorAll('[id^="stat-"]').forEach(card => {
         card.classList.remove('ring-2', 'ring-violet-300', 'ring-emerald-300', 'ring-red-300');
     });
-    const rings = { posted: 'ring-violet-300', approved: 'ring-emerald-300', rejected: 'ring-red-300' };
+    const rings = { posted: 'ring-violet-300', approved: 'ring-emerald-300', rejected: 'ring-red-300', failed: 'ring-amber-300' };
     document.getElementById(`stat-${tab}`)?.classList.add('ring-2', rings[tab]);
 
     loadPosts(tab);
@@ -297,6 +330,7 @@ async function loadPosts(status) {
                 approved: { icon: '5 13l4 4L19 7', title: 'No approved posts yet', sub: 'Approved posts waiting to be published will appear here' },
                 rejected: { icon: '6 18L18 6M6 6l12 12', title: 'No rejected posts', sub: 'Posts you reject from the queue will show here' },
                 posted: { icon: '7 11l5-5m0 0l5 5m-5-5v12', title: 'No posts published yet', sub: 'Published posts with engagement metrics will appear here' },
+                failed: { icon: '5 13l4 4L19 7', title: 'Nothing failed', sub: 'Posts that could not be published show up here with the reason and a Retry button' },
             };
             const m = msgs[status];
             container.innerHTML = `<div class="text-center py-20"><div class="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4"><svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M${m.icon}"/></svg></div><p class="text-gray-500 font-medium">${m.title}</p><p class="text-gray-400 text-sm mt-1">${m.sub}</p></div>`;
@@ -337,7 +371,11 @@ function renderPosts(posts, status) {
         const statusBadge = status === 'posted'
             ? '<span class="badge bg-violet-50 text-violet-700 border border-violet-200">Published</span>'
             : status === 'approved'
-            ? '<span class="badge bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>'
+            ? (post.status === 'scheduled'
+                ? '<span class="badge bg-blue-50 text-blue-700 border border-blue-200">Scheduled</span>'
+                : '<span class="badge bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>')
+            : status === 'failed'
+            ? '<span class="badge bg-amber-50 text-amber-700 border border-amber-200">Failed</span>'
             : '<span class="badge bg-red-50 text-red-600 border border-red-200">Rejected</span>';
 
         const date = status === 'posted' ? post.posted_at : post.created_at;
@@ -382,10 +420,19 @@ function renderPosts(posts, status) {
         if (post.rejection_reason && status === 'rejected') {
             rejectionHtml = `<div class="mt-2 px-3 py-2 bg-red-50/50 rounded-lg"><p class="text-xs text-red-500"><span class="font-medium">Reason:</span> ${esc(post.rejection_reason)}</p></div>`;
         }
+        if (post.last_error && (status === 'failed' || status === 'posted')) {
+            rejectionHtml += `<div class="mt-2 px-3 py-2 bg-amber-50/70 rounded-lg"><p class="text-xs text-amber-700"><span class="font-medium">${status === 'failed' ? 'Why it failed' : 'Note'}:</span> ${esc(post.last_error)}</p></div>`;
+        }
 
         // Action buttons
         let actionsHtml = '';
-        if (status === 'approved') {
+        if (status === 'failed') {
+            actionsHtml = `
+                <div class="flex items-center gap-2">
+                    <button onclick="event.stopPropagation(); copyContent(${post.id})" class="btn btn-ghost btn-sm">Copy</button>
+                    <button onclick="event.stopPropagation(); retryPost(${post.id}, this)" class="btn btn-primary btn-sm">Retry</button>
+                </div>`;
+        } else if (status === 'approved') {
             actionsHtml = `
                 <div class="flex items-center gap-2">
                     <button onclick="event.stopPropagation(); openEditModal(${post.id})" class="btn btn-ghost btn-sm">Edit</button>
@@ -496,13 +543,18 @@ function openViewModal(id) {
 
     // Engagement
     const engEl = document.getElementById('view-engagement');
+    const statsForm = document.getElementById('view-stats-form');
     if (post.status === 'posted') {
         document.getElementById('view-likes').textContent = post.likes || 0;
         document.getElementById('view-comments').textContent = post.comments || 0;
         document.getElementById('view-shares').textContent = post.shares || 0;
         engEl.classList.remove('hidden');
+        statsForm.dataset.postId = post.id;
+        ['impressions', 'likes', 'comments', 'shares'].forEach(k => { document.getElementById('stat-' + k).value = post[k] || 0; });
+        statsForm.classList.remove('hidden');
     } else {
         engEl.classList.add('hidden');
+        statsForm.classList.add('hidden');
     }
 
     // Actions
@@ -538,8 +590,25 @@ function copyContent(id) { const p = historyData.find(p => p.id === id); if (p) 
 
 /* ── Post Now ────────────────────────────────────────────── */
 
+async function retryPost(id, btn) {
+    if (btn) btn.disabled = true;
+    try {
+        const res = await fetch(`/api/queue/${id}/retry`, { method: 'POST' });
+        const d = await res.json().catch(() => ({}));
+        if (res.ok) {
+            showToast(d.status === 'approved' ? 'Back in Approved — it will publish at the next posting slot' : 'Back in the review queue');
+            loadPosts(currentTab);
+        } else { showToast(d.error || 'Retry failed', 'error'); }
+    } catch { showToast('Retry failed', 'error'); }
+    finally { if (btn) btn.disabled = false; }
+}
+
 async function postNow(id, btn) {
-    if (!confirm('Post this to LinkedIn right now?')) return;
+    if (!(await App.confirm({
+        title: 'Publish to LinkedIn now?',
+        message: 'This goes live on your profile immediately and cannot be undone.',
+        confirmText: 'Publish now',
+    }))) return;
     const origHtml = btn ? btn.innerHTML : '';
     if (btn) { btn.disabled = true; btn.innerHTML = '<svg class="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Posting...'; }
     try {
@@ -602,8 +671,8 @@ function updateEditStats() {
     document.getElementById('edit-word-count').textContent = `${wc} words`;
     const warn = document.getElementById('edit-char-warn');
     if (cc > 3000) { warn.textContent = `${cc - 3000} over limit!`; warn.className = 'text-xs text-red-500 font-medium'; }
-    else if (nl > 34) { warn.textContent = `${nl} newlines — will be truncated! (max 34)`; warn.className = 'text-xs text-red-500 font-medium'; }
-    else if (nl > 28) { warn.textContent = `${nl} newlines — risk of truncation`; warn.className = 'text-xs text-amber-500'; }
+    else if (nl > 25) { warn.textContent = `${nl} newlines — LinkedIn will cut the end (max 25)`; warn.className = 'text-xs text-red-500 font-medium'; }
+    else if (nl > 22) { warn.textContent = `${nl} newlines — close to the 25 limit`; warn.className = 'text-xs text-amber-500'; }
     else if (cc > 2700) { warn.textContent = `${3000 - cc} chars remaining`; warn.className = 'text-xs text-amber-500'; }
     else { warn.textContent = `${nl} line breaks · Max 3,000 chars`; warn.className = 'text-xs text-gray-400'; }
 }
@@ -618,7 +687,7 @@ async function saveEdit() {
     const content = document.getElementById('edit-textarea').value;
     if (content.length > 3000) { showToast('Post exceeds 3,000 character limit', 'error'); return; }
     const nl = (content.match(/\n/g) || []).length;
-    if (nl > 34) { showToast(`Too many line breaks (${nl}/34 max)`, 'error'); return; }
+    if (nl > 25) { showToast(`Too many line breaks (${nl}/25 max)`, 'error'); return; }
     const res = await fetch(`/api/queue/${editingPostId}/edit`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content}) });
     if (res.ok) { originalEditContent = content; editingPostId = null; document.getElementById('edit-modal').classList.add('hidden'); loadPosts(currentTab); showToast('Post updated'); }
     else { const d = await res.json().catch(() => ({})); showToast(d.error || 'Failed to save', 'error'); }
@@ -629,7 +698,11 @@ async function saveAndPostNow() {
     if (content.length > 3000) { showToast('Post exceeds 3,000 character limit', 'error'); return; }
     const editRes = await fetch(`/api/queue/${editingPostId}/edit`, { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({content}) });
     if (!editRes.ok) { const d = await editRes.json().catch(() => ({})); showToast(d.error || 'Failed to save', 'error'); return; }
-    if (!confirm('Post this to LinkedIn right now?')) return;
+    if (!(await App.confirm({
+        title: 'Save and publish now?',
+        message: 'Your edits are saved. Publishing makes the post live on your profile immediately.',
+        confirmText: 'Publish now',
+    }))) return;
     const postRes = await fetch(`/api/post-now/${editingPostId}`, {method: 'POST'});
     if (postRes.ok) { originalEditContent = content; editingPostId = null; document.getElementById('edit-modal').classList.add('hidden'); showToast('Saved & posted to LinkedIn!'); loadPosts(currentTab); }
     else { const d = await postRes.json().catch(() => ({})); showToast(d.error || 'Failed to post', 'error'); }

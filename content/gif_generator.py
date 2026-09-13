@@ -409,6 +409,9 @@ class ScreenRecordGifGenerator:
         if not settings.SCREEN_RECORD_ENABLED:
             raise RuntimeError("Screen recording is disabled in config")
 
+        from utils.netguard import check_public_url
+        check_public_url(url)  # raises UnsafeURLError for local/private targets
+
         from playwright.async_api import async_playwright
 
         actions = actions or [

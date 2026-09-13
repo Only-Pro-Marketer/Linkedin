@@ -41,6 +41,9 @@ Virality score (1-100) from virality_scorer.py. Fast feedback (~10 sec per varia
 <!-- Auto-populated by runner — do not edit below this line -->
 | # | Type | Topic | Winner | Score | Spread | Date |
 |---|------|-------|--------|-------|--------|------|
+| 7 | hook | Health and Wellness Ecommerce Examples a | statistic | 95 | 6 | 2026-09-13 |
+| 8 | tone | How is ecommerce for dietary supplements | authoritative | 85 | 12 | 2026-09-13 |
+| 9 | length | Top Health & Wellness DTC Brands in the  | 220 | 88 | 10 | 2026-09-13 |
 
 ## Win Rates by Parameter
 

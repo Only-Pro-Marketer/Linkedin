@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Profile Optimizer{% endblock %}
+{% block page_title %}Profile Optimizer{% endblock %}
+
+{% block head %}
+<style>
+    .part { padding: 12px 0; border-top: 1px solid var(--border-primary); }
+    .part:first-of-type { border-top: 0; }
+    .bar { height: 6px; border-radius: 4px; background: #eef0f3; overflow: hidden; margin-top: 6px; }
+    .bar span { display: block; height: 100%; border-radius: 4px; }
+    .score-big { font-size: 40px; font-weight: 700; letter-spacing: -0.02em; line-height: 1; }
+    .copy-block { padding: 12px 14px; border: 1px solid var(--border-primary); border-radius: 10px; font-size: 13px; line-height: 1.55; white-space: pre-wrap; background: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Profile Optimizer</h1>
+        <p>Paste your profile to get a 9-part scorecard, with rewrites you can copy straight into LinkedIn.</p>
+    </div>
+</div>
+
+<div class="grid-main">
+    <div class="card card-pad">
+        <label class="field-label" for="p-headline">Headline</label>
+        <input id="p-headline" class="field-input" maxlength="400" value="{{ last_input.headline or '' }}" autocomplete="off">
+        <p class="tiny muted" style="margin-top: 4px;"><span id="p-headline-count">0</span> / 220 characters</p>
+
+        <label class="field-label" for="p-about">About</label>
+        <textarea id="p-about" class="field-input" rows="8">{{ last_input.about or '' }}</textarea>
+
+        <label class="field-label" for="p-experience">Most recent role <span class="muted" style="font-weight: 400;">(title, company, bullets)</span></label>
+        <textarea id="p-experience" class="field-input" rows="5">{{ last_input.experience or '' }}</textarea>
+
+        <div class="grid-2" style="gap: 12px;">
+            <div>
+                <label class="field-label" for="p-skills">Top skills</label>
+                <input id="p-skills" class="field-input" placeholder="Email marketing, CRO, …" value="{{ last_input.skills or '' }}">
+            </div>
+            <div>
+                <label class="field-label" for="p-url">Profile URL</label>
+                <input id="p-url" class="field-input" placeholder="https://www.linkedin.com/in/your-name" value="{{ last_input.profile_url or profile_url }}">
+            </div>
+        </div>
+
+        <label class="field-label" for="p-featured">Featured section <span class="muted" style="font-weight: 400;">(what's pinned)</span></label>
+        <input id="p-featured" class="field-input" placeholder="e.g. a case study PDF and my newsletter" value="{{ last_input.featured or '' }}">
+
+        <div class="row-actions" style="margin-top: 14px; gap: 16px;">
+            <label class="tiny" style="display: flex; gap: 6px; align-items: center;"><input type="checkbox" id="p-banner" {% if last_input.has_banner %}checked{% endif %}> Custom banner</label>
+            <label class="tiny" style="display: flex; gap: 6px; align-items: center;"><input type="checkbox" id="p-photo" {% if last_input.has_photo %}checked{% endif %}> Professional headshot</label>
+            <label class="tiny" style="display: flex; gap: 6px; align-items: center;">Recommendations
+                <input type="number" id="p-recs" min="0" class="field-input" style="width: 80px; padding: 5px 8px;" value="{{ last_input.recommendations if last_input.recommendations is not none else '' }}"></label>
+        </div>
+
+        <button type="button" class="btn btn-primary btn-md" style="margin-top: 18px;" onclick="reviewProfile(this)">Score my profile</button>
+    </div>
+
+    <div class="stack" id="results"></div>
+</div>
+
+<script>
+let LAST = {{ last_output|tojson }};
+const $ = (id) => document.getElementById(id);
+const val = (id) => $(id).value.trim();
+const color = (s) => (s === null || s === undefined ? '#d0d5dd' : s >= 8 ? '#12b76a' : s >= 5 ? '#f79009' : '#f04438');
+
+function updateCount() { $('p-headline-count').textContent = $('p-headline').value.length; }
+$('p-headline').addEventListener('input', updateCount);
+updateCount();
+
+function copyBullets() { App.copy(LAST.experience_bullets.map(b => '• ' + b).join('\n')); }
+
+function renderResults(r) {
+    if (!r) {
+        $('results').innerHTML = `<div class="card card-pad"><div class="empty-state" style="padding: 40px 12px;">
+            <p class="empty-state-title">Your scorecard appears here</p>
+            <p class="empty-state-text">Headline and About matter most. Paste at least one of them.</p></div></div>`;
+        return;
+    }
+    const parts = r.parts.map(p => `
+        <div class="part">
+            <div style="display: flex; justify-content: space-between; gap: 10px;">
+                <span class="row-title">${esc(p.label)}</span>
+                <span class="tiny"><b>${p.score ?? '–'}</b><span class="muted"> / 10</span></span>
+            </div>
+            <div class="bar"><span style="width: ${(p.score || 0) * 10}%; background: ${color(p.score)};"></span></div>
+            <div class="tiny muted" style="margin-top: 6px;">${esc(p.verdict)}</div>
+            ${p.fix ? `<div class="tiny" style="margin-top: 3px;"><b>Fix:</b> ${esc(p.fix)}</div>` : ''}
+        </div>`).join('');
+    $('results').innerHTML = `
+        <div class="card card-pad">
+            <div style="display: flex; gap: 16px; align-items: center;">
+                <div class="score-big" style="color: ${color(r.overall / 10)};">${r.overall}</div>
+                <div><div class="card-title">Profile score</div><div class="tiny muted" style="margin-top: 2px;">${esc(r.top_priority)}</div></div>
+            </div>
+        </div>
+        <div class="card card-pad"><div class="card-title">Scorecard</div>${parts}</div>
+        ${r.headline_options.length ? `<div class="card card-pad"><div class="card-title">Headline options</div>
+            ${r.headline_options.map((h, i) => `<div class="copy-block" style="margin-top: 10px;">${esc(h)}
+                <div class="row-actions" style="margin-top: 6px;"><span class="tiny muted">${h.length} / 220</span>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="App.copy(LAST.headline_options[${i}])">Copy</button></div></div>`).join('')}</div>` : ''}
+        ${r.about_rewrite ? `<div class="card card-pad"><div class="card-title">About, rewritten</div>
+            <div class="copy-block" style="margin-top: 10px;">${esc(r.about_rewrite)}</div>
+            <div class="row-actions"><button type="button" class="btn btn-ghost btn-sm" onclick="App.copy(LAST.about_rewrite)">Copy</button>
+            <span class="tiny muted">Replace every [bracket] with your real details before pasting.</span></div></div>` : ''}
+        ${r.experience_bullets.length ? `<div class="card card-pad"><div class="card-title">Experience bullets</div>
+            <ul class="tiny" style="margin: 10px 0 0 16px; list-style: disc; line-height: 1.7;">${r.experience_bullets.map(b => `<li>${esc(b)}</li>`).join('')}</ul>
+            <div class="row-actions"><button type="button" class="btn btn-ghost btn-sm" onclick="copyBullets()">Copy all</button></div></div>` : ''}`;
+}
+
+async function reviewProfile(btn) {
+    const recs = $('p-recs').value;
+    const body = {
+        headline: val('p-headline'), about: val('p-about'), experience: val('p-experience'), skills: val('p-skills'),
+        featured: val('p-featured'), profile_url: val('p-url'), has_banner: $('p-banner').checked, has_photo: $('p-photo').checked,
+        recommendations: recs === '' ? null : Math.max(0, parseInt(recs, 10) || 0),
+    };
+    if (!body.headline && !body.about) { showToast('Paste at least your headline or About section', 'error'); return; }
+    App.busy(btn, true, 'Reviewing…');
+    try {
+        LAST = await App.api('/api/profile-optimizer', { method: 'POST', body });
+        renderResults(LAST);
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+renderResults(LAST);
+</script>
+{% endblock %}
