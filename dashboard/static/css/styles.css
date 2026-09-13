@@ -569,6 +569,10 @@ body {
 }
 
 /* ── Animations ─────────────────────────────────────────────────── */
+/* Transform animations use fill-mode "backwards", never "both"/"forwards". An animation that
+   keeps filling after it ends still counts as a transform, which makes the element the
+   containing block for position: fixed children, so modals inside .page-enter would center
+   on the (long) page content instead of the screen and open below the fold. */
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -576,7 +580,7 @@ body {
     }
     to {
         opacity: 1;
-        transform: translateY(0);
+        transform: none;
     }
 }
 
@@ -592,12 +596,12 @@ body {
     }
     to {
         opacity: 1;
-        transform: translateX(0);
+        transform: none;
     }
 }
 
 .fade-in-up {
-    animation: fadeInUp var(--duration-slow) var(--ease-out) both;
+    animation: fadeInUp var(--duration-slow) var(--ease-out) backwards;
 }
 
 .fade-in {
@@ -605,7 +609,7 @@ body {
 }
 
 .slide-in-right {
-    animation: slideInRight var(--duration-slow) var(--ease-out) both;
+    animation: slideInRight var(--duration-slow) var(--ease-out) backwards;
 }
 
 /* Stagger delays */
@@ -633,7 +637,7 @@ body {
 
 /* Page entrance */
 .page-enter {
-    animation: fadeInUp 0.35s var(--ease-out) both;
+    animation: fadeInUp 0.35s var(--ease-out) backwards;
 }
 
 /* Fade out for post cards */
