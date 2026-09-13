@@ -35,7 +35,7 @@ apify-client>=1.8.0
 
 # Video / GIF Generation
 moviepy>=1.0.3
-Pillow>=10.0.0
+Pillow>=12.3.0  # older versions have known CVEs; moviepy 2.2.1 declares <12 but works (tested)
 imageio>=2.34.0
 imageio-ffmpeg>=0.5.1
 

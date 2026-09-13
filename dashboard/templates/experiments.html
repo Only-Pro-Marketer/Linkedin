@@ -102,7 +102,7 @@ async function loadSummary() {
                 const sorted = Object.entries(params).sort((a, b) => b[1].win_rate - a[1].win_rate);
                 const bars = sorted.map(([label, d]) => `
                     <div class="flex items-center gap-2 mb-1.5">
-                        <span class="text-xs w-28 truncate" style="color: var(--text-secondary);" title="${label}">${label}</span>
+                        <span class="text-xs w-28 truncate" style="color: var(--text-secondary);" title="${esc(label)}">${esc(label)}</span>
                         <div class="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
                             <div class="h-full rounded-full ${d.win_rate > 40 ? 'bg-green-500' : d.win_rate > 20 ? 'bg-blue-500' : 'bg-gray-300'}" style="width: ${Math.max(d.win_rate, 5)}%"></div>
                         </div>
@@ -112,7 +112,7 @@ async function loadSummary() {
                 `).join('');
                 grid.innerHTML += `
                     <div class="glass-card p-6">
-                        <h4 class="stat-label mb-3">${type}</h4>
+                        <h4 class="stat-label mb-3">${esc(type)}</h4>
                         ${bars}
                     </div>
                 `;
@@ -149,7 +149,7 @@ async function loadExperiments() {
             const variationDots = exp.variations.map(v => {
                 const score = v.virality_score || 0;
                 const color = v.is_winner ? 'bg-green-500' : score >= 65 ? 'bg-blue-400' : score >= 40 ? 'bg-yellow-400' : 'bg-gray-300';
-                return `<div class="w-6 h-6 rounded-full ${color} flex items-center justify-center text-white text-xs font-bold cursor-pointer" title="${v.label}: ${score}">${score}</div>`;
+                return `<div class="w-6 h-6 rounded-full ${color} flex items-center justify-center text-white text-xs font-bold cursor-pointer" title="${esc(v.label)}: ${score}">${score}</div>`;
             }).join('');
 
             return `
@@ -157,7 +157,7 @@ async function loadExperiments() {
                     <div class="flex items-start justify-between gap-5">
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2 mb-1">
-                                <span class="badge ${typeColor}">${exp.type}</span>
+                                <span class="badge ${typeColor}">${esc(exp.type)}</span>
                                 <span class="text-xs" style="color: var(--text-muted);">#${exp.id}</span>
                                 <span class="text-xs" style="color: var(--text-muted);">${date}</span>
                                 ${exp.queued_post_id ? '<span class="badge badge-success">Queued</span>' : ''}
@@ -205,8 +205,8 @@ async function showVariations(expId) {
                 <span class="text-lg font-bold ${v.virality_score >= 65 ? 'score-viral' : v.virality_score >= 40 ? 'score-medium' : 'score-low'}">${v.virality_score || 0}</span>
             </div>
             <div class="flex gap-2 text-xs mb-2" style="color: var(--text-muted);">
-                <span>${v.hook_type || ''}</span>
-                <span>${v.tone || ''}</span>
+                <span>${esc(v.hook_type || '')}</span>
+                <span>${esc(v.tone || '')}</span>
                 <span>${v.word_count || 0}w</span>
             </div>
             <pre class="text-xs whitespace-pre-wrap rounded-xl p-4 max-h-64 overflow-auto" style="color: var(--text-secondary); background: var(--surface-primary); border: 1px solid var(--border-subtle);">${esc(v.content || '')}</pre>

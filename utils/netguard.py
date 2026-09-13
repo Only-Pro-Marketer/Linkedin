@@ -14,7 +14,9 @@ class UnsafeURLError(ValueError):
 
 
 def _is_public_ip(addr: str) -> bool:
-    ip = ipaddress.ip_address(addr)
+    ip = ipaddress.ip_address(addr.split("%", 1)[0])  # drop an IPv6 zone id like %en0
+    if ip.version == 6 and ip.ipv4_mapped:  # ::ffff:127.0.0.1 is really 127.0.0.1
+        ip = ip.ipv4_mapped
     return not (
         ip.is_private
         or ip.is_loopback

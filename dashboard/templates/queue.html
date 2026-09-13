@@ -235,13 +235,13 @@ async function loadQueue() {
                     ${post.has_video && post.video_path ? `
                     <div class="flex-shrink-0 w-56 relative group/img">
                         <div class="absolute top-2 left-2 z-10"><span class="badge badge-neutral text-[10px]">GIF</span></div>
-                        <img src="${escapeHtml(post.video_path)}" alt="Post GIF" loading="lazy" class="w-56 h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition" style="border: 1px solid var(--border-primary);" onclick="event.stopPropagation(); viewImage('${escapeHtml(post.video_path)}')">
+                        <img src="${escapeHtml(post.video_path)}" alt="Post GIF" loading="lazy" class="w-56 h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition" style="border: 1px solid var(--border-primary);" onclick="event.stopPropagation(); viewImage(this.getAttribute('src'))">
                         <button onclick="event.stopPropagation(); removeVideo(${post.id})" class="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-xs" title="Remove GIF">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
                     </div>` : post.has_image && post.image_path ? `
                     <div class="flex-shrink-0 w-56 relative group/img">
-                        <img src="${escapeHtml(post.image_path)}" alt="Post image" loading="lazy" class="w-56 h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition" style="border: 1px solid var(--border-primary);" onclick="event.stopPropagation(); viewImage('${escapeHtml(post.image_path)}')">
+                        <img src="${escapeHtml(post.image_path)}" alt="Post image" loading="lazy" class="w-56 h-40 object-cover rounded-xl cursor-pointer hover:opacity-90 transition" style="border: 1px solid var(--border-primary);" onclick="event.stopPropagation(); viewImage(this.getAttribute('src'))">
                         <button onclick="event.stopPropagation(); removeImage(${post.id})" class="absolute top-1 right-1 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/img:opacity-100 transition-opacity text-xs" title="Remove image">
                             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                         </button>
@@ -294,11 +294,7 @@ async function loadQueue() {
     }
 }
 
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
+function escapeHtml(text) { return esc(text); }  // base.html esc() also escapes quotes
 
 function mediaTypeBadge(post) {
     const type = post.media_type || 'none';
@@ -339,7 +335,7 @@ function viralityBadge(post) {
     };
     const c = configs[perf] || configs.medium;
     const clickable = post.virality_breakdown ? `onclick="showViralityDetail(${post.id})" style="cursor:pointer;"` : '';
-    return `<span class="badge ${c.bg} gap-1" ${clickable} title="Virality: ${score}/100 (${perf})">${c.icon} ${score}/100</span>`;
+    return `<span class="badge ${c.bg} gap-1" ${clickable} title="Virality: ${score}/100 (${esc(String(perf))})">${c.icon} ${score}/100</span>`;
 }
 
 function showViralityDetail(postId) {
@@ -380,7 +376,7 @@ function showViralityDetail(postId) {
             </div>
             <div class="text-center mb-4">
                 <span class="text-4xl font-bold">${score}</span><span class="text-lg text-gray-400">/100</span>
-                <div class="mt-1"><span class="px-3 py-1 rounded-full text-xs font-semibold ${perfColors[perf] || perfColors.medium}">${perfLabels[perf] || perf.toUpperCase()}</span></div>
+                <div class="mt-1"><span class="px-3 py-1 rounded-full text-xs font-semibold ${perfColors[perf] || perfColors.medium}">${perfLabels[perf] || esc(String(perf).toUpperCase())}</span></div>
             </div>
             <div class="space-y-1.5 mb-4">${barsHtml}</div>
             ${strengths ? `<div class="mb-3"><div class="text-xs font-medium text-gray-500 mb-1">Strengths</div><ul class="space-y-0.5">${strengths}</ul></div>` : ''}
@@ -976,7 +972,7 @@ function showFactCheck(id) {
     const verdictColors = { pass: 'text-emerald-700 bg-emerald-50', warning: 'text-amber-700 bg-amber-50', fail: 'text-red-700 bg-red-50' };
     const verdictLabels = { pass: 'Passed', warning: 'Needs Review', fail: 'Failed' };
     document.getElementById('fc-verdict').innerHTML =
-        `<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold ${verdictColors[fc.verdict] || 'bg-gray-100 text-gray-600'}">${verdictLabels[fc.verdict] || fc.verdict}</span>`;
+        `<span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold ${verdictColors[fc.verdict] || 'bg-gray-100 text-gray-600'}">${verdictLabels[fc.verdict] || esc(fc.verdict)}</span>`;
     document.getElementById('fc-summary').textContent = fc.summary || '';
 
     const issuesEl = document.getElementById('fc-issues');

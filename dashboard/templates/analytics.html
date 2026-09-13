@@ -529,6 +529,6 @@ function buildPageNumbers(current, total, fnName) {
 
 function fmtN(n) { if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'; if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'; return n?.toString() || '0'; }
 function trunc(s, l) { return !s ? '--' : s.length > l ? s.slice(0, l) + '...' : s; }
-function esc(t) { const d = document.createElement('div'); d.textContent = t || ''; return d.innerHTML; }
+// esc() comes from base.html (it also escapes quotes)
 </script>
 {% endblock %}

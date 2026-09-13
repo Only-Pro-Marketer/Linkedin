@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Request, UploadFile, File
 from fastapi.responses import HTMLResponse, JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import func, Integer
 from sqlalchemy.orm import Session
 
@@ -88,6 +88,18 @@ class CompetitorCreate(BaseModel):
     linkedin_url: str = ""
     niche: str = ""
     notes: str = ""
+
+    @field_validator("linkedin_url")
+    @classmethod
+    def _linkedin_url_only(cls, value: str) -> str:
+        """Only real LinkedIn links (the URL is shown as a clickable link)."""
+        from linkedin.url_parser import is_linkedin_url
+        value = (value or "").strip()
+        if value and "://" not in value:
+            value = "https://" + value
+        if value and not (value.lower().startswith(("https://", "http://")) and is_linkedin_url(value)):
+            raise ValueError("Use a LinkedIn profile URL, like https://www.linkedin.com/in/name")
+        return value
 
 
 class CompetitorPostCreate(BaseModel):
@@ -675,7 +687,10 @@ async def api_upload_image(post_id: int, file: UploadFile = File(...), db: Sessi
     filename = f"{uuid.uuid4().hex[:12]}.{ext}"
     filepath = os.path.join(img_dir, filename)
 
-    contents = await file.read()
+    max_bytes = 15 * 1024 * 1024
+    contents = await file.read(max_bytes + 1)
+    if len(contents) > max_bytes:
+        return JSONResponse({"error": "That image is too large (max 15 MB)"}, status_code=413)
     with open(filepath, "wb") as f:
         f.write(contents)
 
@@ -794,11 +809,18 @@ async def api_upload_video(post_id: int, file: UploadFile = File(...), db: Sessi
     upload_dir = os.path.join("dashboard", "static", "videos", "uploads")
     os.makedirs(upload_dir, exist_ok=True)
 
-    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else "mp4"
+    # Only the extension comes from the client, and only from a known list (no path tricks)
+    safe_name = os.path.basename(file.filename or "")
+    ext = safe_name.rsplit(".", 1)[-1].lower() if "." in safe_name else "mp4"
+    if ext not in ("mp4", "webm", "mov", "gif"):
+        ext = "mp4"
     temp_filename = f"upload_{uuid.uuid4().hex[:12]}.{ext}"
     temp_path = os.path.join(upload_dir, temp_filename)
 
-    contents = await file.read()
+    max_bytes = 200 * 1024 * 1024
+    contents = await file.read(max_bytes + 1)
+    if len(contents) > max_bytes:
+        return JSONResponse({"error": "That file is too large (max 200 MB)"}, status_code=413)
     with open(temp_path, "wb") as f:
         f.write(contents)
 

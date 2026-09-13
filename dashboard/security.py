@@ -8,10 +8,39 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from config import settings
+from config import LOOPBACK_HOSTS, settings
 
 UNSAFE_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 PUBLIC_PREFIXES = ("/static/", "/login", "/logout", "/favicon")
+ANY_ADDRESS = ("0.0.0.0", "::")
+
+
+def allowed_hosts() -> list[str]:
+    """Host names the dashboard answers to.
+
+    Blocks DNS rebinding: a malicious site that points its own domain at
+    127.0.0.1 still sends its domain in the Host header, so it gets a 400.
+    Extra names (e.g. a LAN hostname) go in ALLOWED_HOSTS.
+    """
+    extra = [h.strip() for h in settings.ALLOWED_HOSTS.split(",") if h.strip()]
+    if settings.HOST in ANY_ADDRESS and settings.DASHBOARD_PASSWORD and not extra:
+        return ["*"]  # listening on the network with a password: the login protects it
+    hosts = ["localhost", "127.0.0.1", "::1", *extra]
+    if settings.HOST not in LOOPBACK_HOSTS and settings.HOST not in ANY_ADDRESS:
+        hosts.append(settings.HOST)
+    return hosts
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Stop other sites from framing the dashboard (clickjacking) and browsers from MIME sniffing."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("Content-Security-Policy", "frame-ancestors 'none'")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault("Referrer-Policy", "same-origin")
+        return response
 
 
 def _same_origin(request: Request) -> bool:
@@ -74,7 +103,12 @@ color:#fff;font-size:15px;font-weight:600;cursor:pointer}.err{color:#d70015;font
 
 
 def _safe_next(next_path: str) -> str:
-    return next_path if next_path.startswith("/") and not next_path.startswith("//") else "/"
+    """Only local paths. Browsers treat "\\" like "/", so "/\\evil.com" is an off-site link."""
+    path = next_path or ""
+    if (not path.startswith("/") or path.startswith("//") or "\\" in path
+            or any(ord(c) < 32 or ord(c) == 127 for c in path)):
+        return "/"
+    return path
 
 
 def _login_html(next_path: str, error: str = "") -> str:

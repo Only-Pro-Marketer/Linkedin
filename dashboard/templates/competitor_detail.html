@@ -279,7 +279,7 @@ function renderProfile() {
 
     if (p.linkedin_url) {
         const link = document.getElementById('linkedin-link');
-        link.href = p.linkedin_url;
+        link.href = safeUrl(p.linkedin_url);
         link.classList.remove('hidden');
     }
 
@@ -331,7 +331,7 @@ function renderPatterns() {
         document.getElementById('hook-bars').innerHTML = pat.hook_styles.map(([style, count]) => {
             const pct = Math.round((count / maxCount) * 100);
             return `<div class="flex items-center gap-2">
-                <span class="text-[11px] text-gray-500 w-28 text-right truncate" title="${fmtLabel(style)}">${fmtLabel(style)}</span>
+                <span class="text-[11px] text-gray-500 w-28 text-right truncate" title="${esc(fmtLabel(style))}">${esc(fmtLabel(style))}</span>
                 <div class="flex-1 bg-gray-100 rounded overflow-hidden h-[22px]">
                     <div class="bar-fill bg-violet-500" style="width:${pct}%">
                         <span class="text-[10px] text-white font-medium">${count}</span>
@@ -347,7 +347,7 @@ function renderPatterns() {
         document.getElementById('format-bars').innerHTML = pat.formats.map(([fmt, count]) => {
             const pct = Math.round((count / maxCount) * 100);
             return `<div class="flex items-center gap-2">
-                <span class="text-[11px] text-gray-500 w-28 text-right truncate" title="${fmtLabel(fmt)}">${fmtLabel(fmt)}</span>
+                <span class="text-[11px] text-gray-500 w-28 text-right truncate" title="${esc(fmtLabel(fmt))}">${esc(fmtLabel(fmt))}</span>
                 <div class="flex-1 bg-gray-100 rounded overflow-hidden h-[22px]">
                     <div class="bar-fill bg-blue-500" style="width:${pct}%">
                         <span class="text-[10px] text-white font-medium">${count}</span>
@@ -379,8 +379,8 @@ function renderTopPosts() {
                     <span class="text-[11px] text-blue-600 font-medium">${p.likes} likes</span>
                     <span class="text-[11px] text-emerald-600 font-medium">${p.comments} cmts</span>
                     <span class="text-[11px] text-violet-600 font-medium">${p.shares} shares</span>
-                    ${p.hook_style ? `<span class="badge bg-violet-50 text-violet-600 text-[9px]">${fmtLabel(p.hook_style)}</span>` : ''}
-                    ${p.content_format ? `<span class="badge bg-blue-50 text-blue-600 text-[9px]">${fmtLabel(p.content_format)}</span>` : ''}
+                    ${p.hook_style ? `<span class="badge bg-violet-50 text-violet-600 text-[9px]">${esc(fmtLabel(p.hook_style))}</span>` : ''}
+                    ${p.content_format ? `<span class="badge bg-blue-50 text-blue-600 text-[9px]">${esc(fmtLabel(p.content_format))}</span>` : ''}
                     ${p.post_url ? `<a href="${safeUrl(p.post_url)}" target="_blank" class="text-[10px] text-blue-500 hover:text-blue-700">View</a>` : ''}
                 </div>
             </div>
@@ -411,7 +411,7 @@ function renderPerformance() {
         document.getElementById('hook-perf-list').innerHTML = hookPerf.map(h => {
             const pct = Math.round((h.avg_engagement / max) * 100);
             return `<div class="perf-row">
-                <span class="text-[11px] text-gray-600 w-28 truncate font-medium">${fmtLabel(h.style)}</span>
+                <span class="text-[11px] text-gray-600 w-28 truncate font-medium">${esc(fmtLabel(h.style))}</span>
                 <div class="flex-1 bg-gray-100 rounded overflow-hidden h-5">
                     <div class="bar-fill bg-gradient-to-r from-violet-400 to-violet-600" style="width:${pct}%">
                         <span class="text-[10px] text-white font-medium">${h.avg_engagement}</span>
@@ -427,7 +427,7 @@ function renderPerformance() {
         document.getElementById('format-perf-list').innerHTML = fmtPerf.map(f => {
             const pct = Math.round((f.avg_engagement / max) * 100);
             return `<div class="perf-row">
-                <span class="text-[11px] text-gray-600 w-28 truncate font-medium">${fmtLabel(f.format)}</span>
+                <span class="text-[11px] text-gray-600 w-28 truncate font-medium">${esc(fmtLabel(f.format))}</span>
                 <div class="flex-1 bg-gray-100 rounded overflow-hidden h-5">
                     <div class="bar-fill bg-gradient-to-r from-blue-400 to-blue-600" style="width:${pct}%">
                         <span class="text-[10px] text-white font-medium">${f.avg_engagement}</span>
@@ -615,8 +615,8 @@ function renderAllPosts(posts) {
         <div class="post-full-card glass-card p-6 fade-in" style="animation-delay: ${Math.min(i, 10) * 30}ms">
             <div class="flex items-start justify-between mb-2">
                 <div class="flex items-center gap-2 flex-wrap">
-                    ${p.hook_style ? `<span class="badge bg-violet-50 text-violet-700 text-[10px]">${fmtLabel(p.hook_style)}</span>` : ''}
-                    ${p.content_format ? `<span class="badge bg-blue-50 text-blue-700 text-[10px]">${fmtLabel(p.content_format)}</span>` : ''}
+                    ${p.hook_style ? `<span class="badge bg-violet-50 text-violet-700 text-[10px]">${esc(fmtLabel(p.hook_style))}</span>` : ''}
+                    ${p.content_format ? `<span class="badge bg-blue-50 text-blue-700 text-[10px]">${esc(fmtLabel(p.content_format))}</span>` : ''}
                     ${p.topic ? `<span class="badge bg-gray-100 text-gray-600 text-[10px]">${esc(p.topic)}</span>` : ''}
                     ${p.has_image ? '<span class="badge bg-pink-50 text-pink-600 text-[9px]">Image</span>' : ''}
                     ${p.has_video ? '<span class="badge bg-red-50 text-red-600 text-[9px]">Video</span>' : ''}
@@ -629,13 +629,13 @@ function renderAllPosts(posts) {
                 </div>
             </div>
 
-            <div id="${expanded}-short" class="cursor-pointer" onclick="toggleExpand('${expanded}')">
+            <div id="${expanded}-short" class="cursor-pointer" data-target="${expanded}" onclick="toggleExpand(this.dataset.target)">
                 <p class="text-sm text-gray-700 leading-relaxed line-clamp-3 whitespace-pre-line">${esc(p.content)}</p>
                 <span class="text-[10px] text-blue-500 mt-1 inline-block">Show more</span>
             </div>
             <div id="${expanded}-full" class="hidden">
                 <p class="text-sm text-gray-700 leading-relaxed whitespace-pre-line">${esc(p.content)}</p>
-                <span class="text-[10px] text-blue-500 mt-1 inline-block cursor-pointer" onclick="toggleExpand('${expanded}')">Show less</span>
+                <span class="text-[10px] text-blue-500 mt-1 inline-block cursor-pointer" data-target="${expanded}" onclick="toggleExpand(this.dataset.target)">Show less</span>
             </div>
 
             <div class="flex items-center justify-between mt-3 pt-3 border-t border-gray-100">
@@ -786,12 +786,7 @@ async function toggleSaveFromDetail(postId, btn) {
 }
 
 // ── Utilities ──
-function esc(str) {
-    if (!str) return '';
-    const div = document.createElement('div');
-    div.textContent = str;
-    return div.innerHTML;
-}
+// esc() comes from base.html (it also escapes quotes)
 
 function fmtLabel(str) {
     if (!str) return '';

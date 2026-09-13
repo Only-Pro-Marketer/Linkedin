@@ -138,7 +138,7 @@
         if (!status) return '<span class="q-badge q-none"><span class="q-dot"></span>Not checked</span>';
         const n = (r.blockers || []).length;
         const title = n ? `${n} issue${n > 1 ? 's' : ''} to fix before posting` : `Quality score ${s}/100`;
-        return `<span class="q-badge q-${status}" title="${esc(title)}"><span class="q-dot"></span>${Q_LABEL[status] || status} · ${s}</span>`;
+        return `<span class="q-badge q-${Q_LABEL[status] ? status : 'none'}" title="${esc(title)}"><span class="q-dot"></span>${Q_LABEL[status] || esc(status)} · ${esc(String(s ?? ''))}</span>`;
     };
 
     window.App = App;

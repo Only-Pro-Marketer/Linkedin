@@ -17,7 +17,14 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from starlette.middleware.sessions import SessionMiddleware  # noqa: E402
 
 from config import LOOPBACK_HOSTS, get_secret_key, settings  # noqa: E402
-from dashboard.security import LoginRequiredMiddleware, SameOriginMiddleware  # noqa: E402
+from starlette.middleware.trustedhost import TrustedHostMiddleware  # noqa: E402
+
+from dashboard.security import (  # noqa: E402
+    LoginRequiredMiddleware,
+    SameOriginMiddleware,
+    SecurityHeadersMiddleware,
+    allowed_hosts,
+)
 from database.engine import SessionLocal, init_database  # noqa: E402
 
 logger = logging.getLogger(__name__)
@@ -53,7 +60,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="LinkedIn Content Engine", lifespan=lifespan)
 
-# Middleware runs outermost-last-added: session → CSRF check → login check → routes
+# Middleware runs outermost-last-added:
+# host check → security headers → session → CSRF check → login check → routes
 app.add_middleware(LoginRequiredMiddleware)
 app.add_middleware(SameOriginMiddleware)
 app.add_middleware(
@@ -63,6 +71,8 @@ app.add_middleware(
     same_site="lax",
     max_age=14 * 24 * 3600,
 )
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())  # blocks DNS rebinding
 
 app.mount("/static", StaticFiles(directory="dashboard/static"), name="static")
 
