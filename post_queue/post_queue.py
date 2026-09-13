@@ -4,7 +4,10 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-from database.models import PostStatus, QueuedPost, PostPerformance
+from database.models import PostStatus, QueuedPost
+
+REVIEWABLE = (PostStatus.QUEUED, PostStatus.DRAFT)
+EDITABLE = (PostStatus.QUEUED, PostStatus.DRAFT, PostStatus.APPROVED, PostStatus.SCHEDULED)
 
 
 class PostQueue:
@@ -30,7 +33,7 @@ class PostQueue:
         return (
             self.db.query(QueuedPost)
             .filter(QueuedPost.status == PostStatus.APPROVED)
-            .order_by(QueuedPost.created_at)
+            .order_by(QueuedPost.approved_at, QueuedPost.created_at)
             .all()
         )
 
@@ -63,6 +66,16 @@ class PostQueue:
             .all()
         )
 
+    def get_failed(self, limit: int = 50) -> list[QueuedPost]:
+        """Get posts whose publish failed or was interrupted."""
+        return (
+            self.db.query(QueuedPost)
+            .filter(QueuedPost.status.in_([PostStatus.FAILED, PostStatus.POSTING]))
+            .order_by(QueuedPost.updated_at.desc())
+            .limit(limit)
+            .all()
+        )
+
     def get_by_id(self, post_id: int) -> QueuedPost | None:
         """Get a single post by ID."""
         return self.db.query(QueuedPost).filter(QueuedPost.id == post_id).first()
@@ -71,12 +84,9 @@ class PostQueue:
         """Return counts by status."""
         result = {}
         for status in PostStatus:
-            count = (
-                self.db.query(QueuedPost)
-                .filter(QueuedPost.status == status)
-                .count()
+            result[status.value] = (
+                self.db.query(QueuedPost).filter(QueuedPost.status == status).count()
             )
-            result[status.value] = count
         result["total"] = sum(result.values())
         return result
 
@@ -88,9 +98,12 @@ class PostQueue:
         edited_content: str | None = None,
         scheduled_time: datetime | None = None,
     ) -> QueuedPost | None:
-        """Approve a post. Optionally edit and/or schedule it."""
+        """Approve a post (explicit user action). Optionally edit and/or schedule it.
+
+        `scheduled_time` must be naive UTC.
+        """
         post = self.get_by_id(post_id)
-        if not post or post.status not in (PostStatus.QUEUED, PostStatus.DRAFT):
+        if not post or post.status not in REVIEWABLE:
             return None
 
         if edited_content and edited_content.strip() != post.content.strip():
@@ -98,23 +111,28 @@ class PostQueue:
             post.content = edited_content.strip()
             post.word_count = len(edited_content.split())
 
+        now = datetime.utcnow()
+        post.approved_at = now
         if scheduled_time:
             post.status = PostStatus.SCHEDULED
             post.scheduled_time = scheduled_time
         else:
             post.status = PostStatus.APPROVED
 
-        post.updated_at = datetime.utcnow()
+        post.updated_at = now
         self.db.commit()
         self.db.refresh(post)
         return post
 
     def schedule(self, post_id: int, scheduled_time: datetime) -> QueuedPost | None:
-        """Schedule a post for a specific time. Also works as reschedule."""
+        """Schedule (or reschedule) a post for a naive-UTC time.
+
+        Choosing a time is itself an explicit decision to publish, so the post
+        will go out then. It does NOT mark the post as approved: unscheduling
+        a never-approved post sends it back to the review queue.
+        """
         post = self.get_by_id(post_id)
-        if not post or post.status not in (
-            PostStatus.QUEUED, PostStatus.DRAFT, PostStatus.APPROVED, PostStatus.SCHEDULED
-        ):
+        if not post or post.status not in EDITABLE:
             return None
         post.status = PostStatus.SCHEDULED
         post.scheduled_time = scheduled_time
@@ -124,11 +142,11 @@ class PostQueue:
         return post
 
     def unschedule(self, post_id: int) -> QueuedPost | None:
-        """Remove scheduling from a post, reverting to approved status."""
+        """Remove scheduling: approved posts go back to APPROVED, others to QUEUED."""
         post = self.get_by_id(post_id)
         if not post or post.status != PostStatus.SCHEDULED:
             return None
-        post.status = PostStatus.APPROVED
+        post.status = PostStatus.APPROVED if post.approved_at else PostStatus.QUEUED
         post.scheduled_time = None
         post.updated_at = datetime.utcnow()
         self.db.commit()
@@ -138,7 +156,7 @@ class PostQueue:
     def reject(self, post_id: int, reason: str = "") -> QueuedPost | None:
         """Reject a post with optional reason."""
         post = self.get_by_id(post_id)
-        if not post or post.status not in (PostStatus.QUEUED, PostStatus.DRAFT):
+        if not post or post.status not in REVIEWABLE:
             return None
 
         post.status = PostStatus.REJECTED
@@ -149,9 +167,9 @@ class PostQueue:
         return post
 
     def edit_content(self, post_id: int, new_content: str) -> QueuedPost | None:
-        """Edit a post's content (while keeping it in queue)."""
+        """Edit a post's content. Allowed until it is published."""
         post = self.get_by_id(post_id)
-        if not post or post.status not in (PostStatus.QUEUED, PostStatus.DRAFT):
+        if not post or post.status not in EDITABLE:
             return None
 
         post.user_edits = new_content.strip()
@@ -162,23 +180,26 @@ class PostQueue:
         self.db.refresh(post)
         return post
 
+    def retry_failed(self, post_id: int) -> QueuedPost | None:
+        """Send a FAILED post back to where it was: approved or review queue."""
+        post = self.get_by_id(post_id)
+        if not post or post.status != PostStatus.FAILED:
+            return None
+        post.status = PostStatus.APPROVED if post.approved_at else PostStatus.QUEUED
+        post.scheduled_time = None
+        post.last_error = None
+        post.updated_at = datetime.utcnow()
+        self.db.commit()
+        self.db.refresh(post)
+        return post
+
     def bulk_approve(self, post_ids: list[int]) -> list[QueuedPost]:
         """Approve multiple posts at once."""
-        approved = []
-        for pid in post_ids:
-            post = self.approve(pid)
-            if post:
-                approved.append(post)
-        return approved
+        return [p for p in (self.approve(pid) for pid in post_ids) if p]
 
     def bulk_reject(self, post_ids: list[int], reason: str = "") -> list[QueuedPost]:
         """Reject multiple posts at once."""
-        rejected = []
-        for pid in post_ids:
-            post = self.reject(pid, reason)
-            if post:
-                rejected.append(post)
-        return rejected
+        return [p for p in (self.reject(pid, reason) for pid in post_ids) if p]
 
     def delete_post(self, post_id: int) -> bool:
         """Permanently delete a post from the queue."""

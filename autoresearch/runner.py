@@ -13,9 +13,10 @@ from pathlib import Path
 
 from sqlalchemy.orm import Session
 
-from config import settings, get_anthropic_client
+import llm
+from config import settings
 from content.post_formatter import format_for_linkedin, validate_length
-from content.prompt_builder import BRAND_PERSONA, VIRALITY_RULES, build_generation_prompt
+from content.prompt_builder import WRITING_RULES, build_generation_prompt
 from content.templates.template_library import get_all_templates, get_template_by_name
 from content.virality_scorer import ViralityScorer
 from database.models import (
@@ -33,8 +34,8 @@ logger = logging.getLogger(__name__)
 PROGRAM_PATH = Path(__file__).resolve().parent / "program.md"
 
 # Experiment dimension definitions
+# Question openers are excluded: 2026 reach data shows they underperform.
 HOOK_STYLES = [
-    ("question", "Start with a provocative question that makes the reader stop scrolling."),
     ("contrarian", "Start with a contrarian statement that challenges conventional wisdom."),
     ("bold_statement", "Start with a bold, definitive statement that demands attention."),
     ("story_opener", "Start with a personal story opening — a specific moment in time."),
@@ -66,17 +67,29 @@ class ExperimentRunner:
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = get_anthropic_client()
         self.scorer = ViralityScorer()
         self.analyzer = PostAnalyzer()
+
+    def blocked_reason(self) -> str | None:
+        """Why experiments can't run yet (off, or not enough real posts), or None."""
+        from database.models import PostStatus, QueuedPost
+
+        if not settings.AUTORESEARCH_ENABLED:
+            return "Autoresearch is turned off in Settings."
+        posted = self.db.query(QueuedPost).filter(QueuedPost.status == PostStatus.POSTED).count()
+        if posted < settings.AUTORESEARCH_MIN_POSTED:
+            return (f"Autoresearch starts after {settings.AUTORESEARCH_MIN_POSTED} published posts "
+                    f"(you have {posted}). Until then it could only learn from Claude's own guesses.")
+        return None
 
     def run_experiment_cycle(self) -> list[dict]:
         """Run a full experiment cycle — multiple experiments per cycle.
 
         Returns list of experiment result dicts.
         """
-        if not settings.AUTORESEARCH_ENABLED:
-            logger.info("Autoresearch disabled, skipping")
+        reason = self.blocked_reason()
+        if reason:
+            logger.info("Autoresearch skipped: %s", reason)
             return []
 
         program = self._read_program()
@@ -216,22 +229,15 @@ class ExperimentRunner:
         # Queue the winner if it meets the threshold
         queued_post = None
         if (winner.virality_score or 0) >= settings.AUTORESEARCH_MIN_SCORE_TO_QUEUE:
-            queued_post = QueuedPost(
-                content=winner.content,
-                hook=self.analyzer.analyze(winner.content).hook,
-                hook_type=winner.hook_type,
+            from content.pipeline import create_queued_post
+
+            queued_post = create_queued_post(
+                self.db, winner.content, topic=topic, source="experiment",
                 template_name=winner.template_name,
-                word_count=winner.word_count,
-                status=PostStatus.QUEUED,
-                topic=topic,
                 research_context=f"[AUTORESEARCH] Experiment #{experiment.id}: {hypothesis}",
-                virality_score=winner.virality_score,
-                virality_breakdown=winner.virality_breakdown,
-                virality_performance=self._score_to_tier(winner.virality_score),
+                review=False,  # already scored during the experiment
+                virality=json.loads(winner.virality_breakdown or "{}") or None,
             )
-            self.db.add(queued_post)
-            self.db.commit()
-            self.db.refresh(queued_post)
             experiment.queued_post_id = queued_post.id
 
         self.db.commit()
@@ -288,25 +294,15 @@ class ExperimentRunner:
             performance_context=performance_context,
         )
 
-        # Insert experiment instruction after VIRALITY_RULES
+        # Insert the experiment instruction before the task instructions
         if experiment_instruction:
-            prompt = prompt.replace(
-                "WRITING INSTRUCTIONS:",
-                f"{experiment_instruction}\nWRITING INSTRUCTIONS:",
-            )
+            prompt = prompt.replace("INSTRUCTIONS:", f"{experiment_instruction}\nINSTRUCTIONS:", 1)
 
         try:
-            message = self.client.messages.create(
-                model=settings.CLAUDE_MODEL,
-                max_tokens=settings.CLAUDE_MAX_TOKENS,
-                temperature=settings.CLAUDE_TEMPERATURE,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw = message.content[0].text.strip()
-            content = format_for_linkedin(raw, topic)
-            return content, prompt
-        except Exception as e:
-            logger.error("Claude API call failed for variation '%s': %s", label, e)
+            raw = llm.complete("autoresearch", prompt, packs=("post",), instructions=WRITING_RULES).text
+            return format_for_linkedin(raw, topic), prompt
+        except llm.LLMError as e:
+            logger.error("Variation '%s' failed: %s", label, e)
             return None, prompt
 
     def _pick_topics(self, count: int) -> list[tuple[str, str]]:

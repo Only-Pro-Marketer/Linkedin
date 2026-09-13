@@ -11,8 +11,11 @@ from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from config import settings, get_anthropic_client
+import llm
+from config import settings
+from content.brand import get_niche
 from content.post_formatter import format_for_linkedin
+from content.prompt_builder import WRITING_RULES
 from content.virality_scorer import ViralityScorer
 from database.models import PostPerformance, PostStatus, QueuedPost
 
@@ -38,15 +41,10 @@ Create a FRESH version of this post that:
 
 RULES:
 - Do NOT copy any specific phrases or sentences from the original
-- Use new data points, client examples, or scenarios
+- Use new angles or scenarios; only use numbers that are real (from the brand profile) or clearly hypothetical
 - Keep the same tone and energy
-- 150-250 words
-- One thought per line with blank lines between
-- No markdown, no hashtags
-- End with an easy-to-answer question
 
-OUTPUT:
-Provide ONLY the rewritten post. No explanations."""
+Output only the rewritten post."""
 
 
 class ContentRecycler:
@@ -54,7 +52,6 @@ class ContentRecycler:
 
     def __init__(self, db: Session):
         self.db = db
-        self.client = get_anthropic_client()
         self.scorer = ViralityScorer()
 
     def find_recyclable_posts(
@@ -137,7 +134,7 @@ class ContentRecycler:
         prompt = RECYCLE_PROMPT.format(
             original_content=original.content,
             template_name=original.template_name or "unknown",
-            topic=original.topic or "e-commerce growth",
+            topic=original.topic or get_niche(),
             engagement_score=engagement_score,
             likes=likes,
             comments=comments,
@@ -145,55 +142,22 @@ class ContentRecycler:
         )
 
         try:
-            message = self.client.messages.create(
-                model=settings.CLAUDE_MODEL,
-                max_tokens=settings.CLAUDE_MAX_TOKENS,
-                temperature=settings.CLAUDE_TEMPERATURE,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            content = message.content[0].text.strip()
-        except Exception as e:
-            logger.error("Claude API error during recycling: %s", e)
-            return {"error": f"Generation failed: {e}"}
+            content = llm.complete("recycle", prompt, packs=("post",), instructions=WRITING_RULES).text
+        except llm.LLMError as e:
+            return {"error": str(e)}
 
-        content = format_for_linkedin(content, original.topic or "")
+        from content.pipeline import create_queued_post
 
-        # Score the recycled post
-        score_result = self.scorer.score(content, original.topic or "")
-        virality_score = score_result.get("total_score", 50)
-
-        # Only queue if it scores reasonably well
-        if virality_score < 45:
-            logger.info(
-                "Recycled post scored too low (%d) — discarding", virality_score
-            )
-            return {
-                "error": f"Recycled post scored {virality_score}/100 — too low to queue",
-                "content": content,
-                "score": virality_score,
-            }
-
-        new_post = QueuedPost(
-            content=content,
-            template_name=original.template_name,
-            topic=original.topic,
-            status=PostStatus.QUEUED,
-            virality_score=virality_score,
-            virality_breakdown=json.dumps(score_result),
-            virality_performance=score_result.get("predicted_performance", "medium"),
-            recycled_from_id=original.id,
-            word_count=len(content.split()),
+        new_post = create_queued_post(
+            self.db, content, topic=original.topic or "", source="recycle",
+            template_name=original.template_name, recycled_from_id=original.id,
+            formula_id=original.formula_id, goal=original.goal,
         )
-        self.db.add(new_post)
-        self.db.commit()
-
-        logger.info(
-            "Recycled post #%d → new post #%d (score: %d)",
-            post_id, new_post.id, virality_score,
-        )
+        logger.info("Recycled post #%d → new post #%d", post_id, new_post.id)
         return {
             "new_post_id": new_post.id,
             "original_post_id": post_id,
-            "virality_score": virality_score,
-            "content_preview": content[:150],
+            "virality_score": new_post.virality_score,
+            "quality_score": new_post.quality_score,
+            "content_preview": new_post.content[:150],
         }

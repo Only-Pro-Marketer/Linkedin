@@ -1,0 +1,314 @@
+{% extends "base.html" %}
+
+{% block title %}Studio{% endblock %}
+{% block page_title %}Studio{% endblock %}
+
+{% block head %}
+<style>
+    [data-panel][hidden] { display: none !important; }
+    .chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+    .formula-opt { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid var(--border-primary); border-radius: 10px; cursor: pointer; transition: border-color .15s, background .15s; }
+    .formula-opt:hover { border-color: var(--text-muted); }
+    .formula-opt.active { border-color: var(--accent, #0071e3); background: var(--accent-light, #eef5fe); }
+    .formula-opt input { margin-top: 3px; }
+    .hook-quote { font-size: 15px; font-weight: 600; line-height: 1.45; padding: 12px 14px; border-left: 3px solid var(--accent, #0071e3); background: var(--bg-secondary, #f7f7f8); border-radius: 0 8px 8px 0; white-space: pre-line; }
+    .angle { padding: 14px 16px; }
+    /* The draft column is narrow: stack editor, preview and quality check */
+    #draft-editor .pe { grid-template-columns: 1fr; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Studio</h1>
+        <p>Write from a proven formula, turn long content into posts, or learn from hooks that worked. Every draft is checked before it reaches your Queue.</p>
+    </div>
+    <div class="page-actions">
+        <a href="/idea" class="btn btn-ghost btn-md">Idea Lab</a>
+    </div>
+</div>
+
+<div class="tabs" role="tablist" style="margin-bottom: 20px;">
+    <button type="button" class="tab active" data-tab="write" role="tab">Write</button>
+    <button type="button" class="tab" data-tab="repurpose" role="tab">Repurpose</button>
+    <button type="button" class="tab" data-tab="hook" role="tab">Hook Lab</button>
+</div>
+
+<div class="grid-main">
+    <div class="stack">
+        <!-- Write -->
+        <section class="card card-pad" data-panel="write">
+            <label class="field-label" for="w-topic">1 · What is the post about?</label>
+            <textarea id="w-topic" class="field-input" rows="3" placeholder="e.g. Why we stopped taking retainers under $3k a month"></textarea>
+
+            <label class="field-label">2 · What should it do?</label>
+            <div class="chip-row" id="w-goals">
+                {% for key, g in goals.items() %}
+                <button type="button" class="chip {% if loop.first %}active{% endif %}" data-goal="{{ key }}" title="{{ g.desc }}">{{ g.label }}</button>
+                {% endfor %}
+            </div>
+            <p class="tiny muted" id="w-goal-desc" style="margin-top: 6px;"></p>
+
+            <label class="field-label">3 · Pick a formula</label>
+            <div id="w-formulas" class="stack" style="gap: 8px;"><div class="skeleton" style="height: 64px;"></div></div>
+            <select id="w-formula-any" class="field-input" style="margin-top: 8px;">
+                <option value="">Or choose any of the 20 formulas…</option>
+                {% for f in formulas %}<option value="{{ f.id }}">{{ f.id }} · {{ f.name }}</option>{% endfor %}
+            </select>
+
+            <label class="field-label" for="w-notes">4 · Your facts <span class="muted" style="font-weight: 400;">— optional, but this is what makes it yours</span></label>
+            <textarea id="w-notes" class="field-input" rows="5" placeholder="Numbers, names, dates, what happened. Claude only uses facts from here and your Brand Voice; anything missing becomes a [placeholder] for you to fill."></textarea>
+            <p class="tiny muted" id="w-needs" style="margin-top: 6px;"></p>
+
+            <button type="button" class="btn btn-primary btn-md" style="margin-top: 16px;" onclick="writeDraft(this)">Write draft</button>
+        </section>
+
+        <!-- Repurpose -->
+        <section class="card card-pad" data-panel="repurpose" hidden>
+            <label class="field-label" for="r-type">What are you repurposing?</label>
+            <select id="r-type" class="field-input">
+                {% for key, label in source_types.items() %}<option value="{{ key }}">{{ label }}</option>{% endfor %}
+            </select>
+            <label class="field-label" for="r-source">Paste it here</label>
+            <textarea id="r-source" class="field-input" rows="12" placeholder="An article, newsletter, podcast transcript or your rough notes. Studio finds up to 3 post angles in it."></textarea>
+            <p class="tiny muted" style="margin-top: 6px;"><span id="r-count">0</span> characters</p>
+
+            <label class="field-label">What should the posts do?</label>
+            <div class="chip-row" id="r-goals">
+                {% for key, g in goals.items() %}
+                <button type="button" class="chip {% if key == 'saves' %}active{% endif %}" data-goal="{{ key }}" title="{{ g.desc }}">{{ g.label }}</button>
+                {% endfor %}
+            </div>
+            <button type="button" class="btn btn-primary btn-md" style="margin-top: 16px;" onclick="findAngles(this)">Find post angles</button>
+            <div id="r-angles" class="stack" style="margin-top: 16px; gap: 10px;"></div>
+        </section>
+
+        <!-- Hook Lab -->
+        <section class="card card-pad" data-panel="hook" hidden>
+            <label class="field-label" for="h-text">Paste a post that stopped your scroll</label>
+            <textarea id="h-text" class="field-input" rows="9" placeholder="Yours or anyone's. Hook Lab names the formula, explains why it works and gives you a reusable template."></textarea>
+            <button type="button" class="btn btn-primary btn-md" style="margin-top: 16px;" onclick="analyzeHook(this)">Analyze hook</button>
+            <div id="h-result" style="margin-top: 18px;"></div>
+        </section>
+    </div>
+
+    <div class="stack" data-panel="write repurpose">
+        <div class="card card-pad">
+            <div class="card-head">
+                <div>
+                    <div class="card-title">Draft</div>
+                    <div class="card-sub" id="draft-sub">Your draft appears here. Edit freely; the quality check updates as you type.</div>
+                </div>
+            </div>
+            <div id="draft-editor"></div>
+        </div>
+    </div>
+
+    <div class="stack" data-panel="hook" hidden>
+        <div class="card card-pad">
+            <div class="card-title">How to use Hook Lab</div>
+            <ol class="tiny muted" style="margin: 10px 0 0 16px; line-height: 1.7; list-style: decimal;">
+                <li>Paste a post whose first line made you stop.</li>
+                <li>See which of the 20 formulas it uses and why it works.</li>
+                <li>Save the template to your hook library. Generated drafts draw on it.</li>
+                <li>Or jump straight to Write with the same formula.</li>
+            </ol>
+        </div>
+    </div>
+</div>
+
+<script>
+const GOALS = {{ goals|tojson }};
+const FORMULAS = {{ formulas|tojson }};
+const $ = (id) => document.getElementById(id);
+const state = { goal: Object.keys(GOALS)[0], rGoal: 'saves', formula: null, shortlist: [], draft: null, angles: [], hook: null };
+
+const editor = new PostEditor($('draft-editor'), {
+    kind: 'post', text: '', minHeight: 300, showPreview: true,
+    placeholder: 'Write here, or use the form to get a first draft.',
+    author: APP.author, headline: APP.headline,
+    actions: [{ label: 'Save to Queue', primary: true, onClick: (ed, btn) => saveToQueue(ed, btn) }],
+});
+
+// ── Tabs ───────────────────────────────────────────
+function showTab(tab) {
+    document.querySelectorAll('.tab[data-tab]').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('[data-panel]').forEach(el => { el.hidden = !el.dataset.panel.split(' ').includes(tab); });
+    history.replaceState(null, '', '#' + tab);
+}
+document.querySelectorAll('.tab[data-tab]').forEach(t => t.addEventListener('click', () => showTab(t.dataset.tab)));
+
+function bindChips(rowId, key, onPick) {
+    document.querySelectorAll(`#${rowId} .chip`).forEach(c => c.addEventListener('click', () => {
+        state[key] = c.dataset.goal;
+        document.querySelectorAll(`#${rowId} .chip`).forEach(x => x.classList.toggle('active', x === c));
+        if (onPick) onPick();
+    }));
+}
+
+// ── Write ──────────────────────────────────────────
+function formulaById(id) { return FORMULAS.find(f => f.id === id); }
+
+function renderFormulas() {
+    let list = state.shortlist.slice();
+    if (state.formula && !list.some(f => f.id === state.formula)) {
+        const picked = formulaById(state.formula);
+        if (picked) list.unshift(picked);
+    }
+    if (!state.formula || !list.some(f => f.id === state.formula)) state.formula = list[0] ? list[0].id : null;
+    $('w-formulas').innerHTML = list.map(f => `
+        <label class="formula-opt ${f.id === state.formula ? 'active' : ''}">
+            <input type="radio" name="formula" value="${esc(f.id)}" ${f.id === state.formula ? 'checked' : ''}>
+            <div>
+                <div class="row-title">${esc(f.id)} · ${esc(f.name)}
+                    ${f.used_recently ? '<span class="q-badge q-none" style="margin-left: 6px;">used this week</span>' : ''}</div>
+                <div class="tiny muted" style="margin-top: 2px;">Best for ${esc(f.best_for)}. ${esc(f.why)}</div>
+            </div>
+        </label>`).join('') || '<p class="tiny muted">No formulas for this goal.</p>';
+    $('w-formulas').querySelectorAll('input[name=formula]').forEach(r => r.addEventListener('change', () => {
+        state.formula = r.value; renderFormulas();
+    }));
+    const f = formulaById(state.formula);
+    $('w-needs').textContent = f && f.needs.length ? `This formula works best with: ${f.needs.join(', ')}.` : '';
+    $('w-goal-desc').textContent = GOALS[state.goal].desc;
+}
+
+async function loadFormulas() {
+    try {
+        const r = await App.api('/api/studio/formulas', { method: 'POST', body: { goal: state.goal, topic: $('w-topic').value }, quiet: true });
+        state.shortlist = r.formulas;
+    } catch (e) { state.shortlist = FORMULAS.filter(f => f.goals.includes(state.goal)).slice(0, 4); }
+    renderFormulas();
+}
+const loadFormulasSoon = App.debounce(loadFormulas, 500);
+
+bindChips('w-goals', 'goal', () => { state.formula = null; loadFormulas(); });
+bindChips('r-goals', 'rGoal');
+$('w-topic').addEventListener('input', loadFormulasSoon);
+$('w-formula-any').addEventListener('change', (e) => {
+    if (!e.target.value) return;
+    state.formula = e.target.value; e.target.value = '';
+    renderFormulas();
+});
+
+function loadDraft(text, meta) {
+    state.draft = meta;
+    editor.text = text;
+    $('draft-sub').textContent = meta.sub;
+    if (window.innerWidth < 1024) $('draft-editor').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function writeDraft(btn) {
+    const topic = $('w-topic').value.trim();
+    if (!topic) { showToast('Tell Studio what the post is about', 'error'); $('w-topic').focus(); return; }
+    App.busy(btn, true, 'Writing…');
+    try {
+        const r = await App.api('/api/studio/write', { method: 'POST', body: { topic, goal: state.goal, formula_id: state.formula, notes: $('w-notes').value } });
+        const label = r.formula ? `${r.formula.id} ${r.formula.name}` : 'Draft';
+        loadDraft(r.text, { topic, goal: state.goal, formula_id: r.formula && r.formula.id, source: 'studio', sub: `${label} · ${GOALS[state.goal].label}` });
+        if (r.changes && r.changes.length) showToast('Auto-fixed: ' + r.changes.join(', '));
+    } catch (e) { /* toast already shown */ } finally { App.busy(btn, false); }
+}
+
+async function saveToQueue(ed, btn) {
+    const text = ed.text.trim();
+    if (!text) { showToast('There is no draft to save yet', 'error'); return; }
+    const meta = state.draft || { source: 'studio' };
+    App.busy(btn, true, 'Saving…');
+    try {
+        const r = await App.api('/api/studio/save', { method: 'POST', body: {
+            text, topic: meta.topic || '', goal: meta.goal || null, formula_id: meta.formula_id || null, source: meta.source || 'studio' } });
+        showToast('Saved to your Queue for review');
+        $('draft-sub').innerHTML = `Saved as post #${r.id}. <a class="link-accent" href="/queue#post-${r.id}">Open in Queue →</a>`;
+    } catch (e) { /* toast already shown */ } finally { App.busy(btn, false); }
+}
+
+// ── Repurpose ──────────────────────────────────────
+$('r-source').addEventListener('input', () => { $('r-count').textContent = $('r-source').value.length.toLocaleString(); });
+
+async function findAngles(btn) {
+    const source_text = $('r-source').value.trim();
+    if (source_text.length < 200) { showToast('Paste at least a few paragraphs (200+ characters)', 'error'); return; }
+    App.busy(btn, true, 'Reading…');
+    try {
+        const r = await App.api('/api/studio/repurpose', { method: 'POST', body: { source_text, source_type: $('r-type').value, goal: state.rGoal } });
+        state.angles = r.angles;
+        $('r-angles').innerHTML = r.angles.map((a, i) => `
+            <div class="card angle">
+                <div style="display: flex; justify-content: space-between; gap: 10px; align-items: flex-start;">
+                    <div>
+                        <div class="row-title">${esc(a.angle)}</div>
+                        <div class="tiny muted">${a.formula ? esc(a.formula.id + ' · ' + a.formula.name) : 'Free form'}</div>
+                    </div>
+                    ${App.qualityBadge(a.report)}
+                </div>
+                <div class="tiny muted line-clamp-2" style="margin: 8px 0 10px;">${esc(a.text.split('\n')[0])}</div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="openAngle(${i})">Open in editor</button>
+            </div>`).join('');
+        if (r.angles.length) openAngle(0);
+    } catch (e) { /* toast already shown */ } finally { App.busy(btn, false); }
+}
+
+function openAngle(i) {
+    const a = state.angles[i];
+    loadDraft(a.text, { topic: a.angle, goal: state.rGoal, formula_id: a.formula && a.formula.id, source: 'repurpose', sub: `Angle ${i + 1}: ${a.angle}` });
+}
+
+// ── Hook Lab ───────────────────────────────────────
+async function analyzeHook(btn) {
+    const text = $('h-text').value.trim();
+    if (!text) { showToast('Paste a post to analyze', 'error'); return; }
+    App.busy(btn, true, 'Analyzing…');
+    try {
+        const r = await App.api('/api/studio/hook', { method: 'POST', body: { text } });
+        state.hook = r;
+        const conf = { high: 'q-ready', medium: 'q-review', low: 'q-none' }[r.confidence] || 'q-none';
+        $('h-result').innerHTML = `
+            <div class="hook-quote">${esc(r.hook)}</div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px;">
+                <span class="row-title">${r.formula ? esc(r.formula.id + ' · ' + r.formula.name) : 'No close formula match'}</span>
+                <span class="q-badge ${conf}"><span class="q-dot"></span>${esc(r.confidence)} confidence</span>
+                ${r.hook_type ? `<span class="chip" style="cursor: default;">${esc(r.hook_type)}</span>` : ''}
+            </div>
+            <label class="field-label">Why it works</label>
+            <p class="tiny" style="line-height: 1.6;">${esc(r.why_it_works)}</p>
+            ${r.reach_flags.length ? `<label class="field-label">Reach risks</label>
+                ${r.reach_flags.map(f => `<div class="tiny" style="color: #b42318; margin-bottom: 4px;">• ${esc(f)}</div>`).join('')}` : ''}
+            ${r.better_version ? `<label class="field-label">Stronger for 2026 reach</label><div class="hook-quote">${esc(r.better_version)}</div>` : ''}
+            <label class="field-label" for="h-template">Reusable template</label>
+            <textarea id="h-template" class="field-input" rows="3">${esc(r.template)}</textarea>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="saveHook(this)">Save to hook library</button>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="App.copy($('h-template').value)">Copy template</button>
+                ${r.formula ? `<button type="button" class="btn btn-ghost btn-sm" onclick="useFormula('${esc(r.formula.id)}')">Write with ${esc(r.formula.id)}</button>` : ''}
+            </div>`;
+    } catch (e) { /* toast already shown */ } finally { App.busy(btn, false); }
+}
+
+async function saveHook(btn) {
+    if (!state.hook) return;
+    App.busy(btn, true, 'Saving…');
+    try {
+        await App.api('/api/studio/hook/save', { method: 'POST', body: {
+            hook: state.hook.hook, template: $('h-template').value, formula_id: state.hook.formula && state.hook.formula.id } });
+        showToast('Saved to your hook library');
+    } catch (e) { /* toast already shown */ } finally { App.busy(btn, false); }
+}
+
+function useFormula(id) {
+    const f = formulaById(id);
+    if (!f) return;
+    state.goal = f.goals[0] || state.goal;
+    document.querySelectorAll('#w-goals .chip').forEach(c => c.classList.toggle('active', c.dataset.goal === state.goal));
+    state.formula = id;
+    showTab('write');
+    loadFormulas();
+    $('w-topic').focus();
+}
+
+const initialTab = location.hash.slice(1);
+showTab(['write', 'repurpose', 'hook'].includes(initialTab) ? initialTab : 'write');
+loadFormulas();
+</script>
+{% endblock %}

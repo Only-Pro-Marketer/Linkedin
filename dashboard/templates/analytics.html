@@ -358,7 +358,7 @@ async function loadHooksStats() {
         if (topHook) {
             el.innerHTML += `<div class="col-span-2 sm:col-span-4 mt-2 glass-card p-6">
                 <p class="stat-label" style="margin-bottom: 4px;">Top Hook (score: ${topHook.engagement_score})</p>
-                <p class="text-sm italic" style="color: var(--text-secondary);">"${topHook.text.substring(0, 150)}${topHook.text.length > 150 ? '...' : ''}"</p>
+                <p class="text-sm italic" style="color: var(--text-secondary);">"${esc(topHook.text.substring(0, 150))}${topHook.text.length > 150 ? '...' : ''}"</p>
             </div>`;
         }
     } catch (e) { console.error(e); }
@@ -406,9 +406,9 @@ async function loadMyPosts(page) {
             const engClass = p.engagement_score >= 50 ? 'score-viral' : p.engagement_score >= 20 ? 'score-high' : '';
             const barWidth = Math.min(100, Math.round(p.engagement_score / maxScore * 100));
             const badges = [];
-            if (p.hook_style) badges.push(`<span class="badge badge-info">${p.hook_style}</span>`);
-            if (p.content_format) badges.push(`<span class="badge badge-neutral">${p.content_format}</span>`);
-            const linkBtn = p.post_url ? `<a href="${esc(p.post_url)}" target="_blank" style="color: var(--accent);" onclick="event.stopPropagation()" title="View on LinkedIn"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>` : '';
+            if (p.hook_style) badges.push(`<span class="badge badge-info">${esc(p.hook_style)}</span>`);
+            if (p.content_format) badges.push(`<span class="badge badge-neutral">${esc(p.content_format)}</span>`);
+            const linkBtn = p.post_url ? `<a href="${safeUrl(p.post_url)}" target="_blank" style="color: var(--accent);" onclick="event.stopPropagation()" title="View on LinkedIn"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg></a>` : '';
 
             return `<div class="px-8 py-4 transition-colors cursor-pointer flex items-center gap-5" style="border-bottom: 1px solid var(--border-subtle);" onmouseover="this.style.background='var(--surface-secondary)'" onmouseout="this.style.background=''" onclick="showMyPostDetail(${i})">
                 <div class="w-8 text-center">

@@ -1,0 +1,178 @@
+{% extends "base.html" %}
+
+{% block title %}Plan{% endblock %}
+{% block page_title %}Plan{% endblock %}
+
+{% block head %}
+<style>
+    .plan-row { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-top: 1px solid var(--border-primary); }
+    .plan-row:first-child { border-top: 0; padding-top: 2px; }
+    .plan-row.skipped { opacity: .55; }
+    .plan-when b { display: block; font-size: 14px; color: var(--text-primary); }
+    .pill-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+    .mix-bar { display: flex; height: 8px; border-radius: 6px; overflow: hidden; background: #eef0f3; margin: 10px 0; }
+    .mix-bar span { display: block; height: 100%; }
+    @media (max-width: 640px) { .plan-row { grid-template-columns: 1fr; gap: 6px; } }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Plan</h1>
+        <p>A week of posts spread across your pillars. Draft any of them into your Queue when you're ready.</p>
+    </div>
+</div>
+
+{% if not pillars %}
+<div class="banner info">
+    <span style="flex: 1;">Planning with three general pillars until you add your own in Brand Voice.</span>
+    <a class="btn btn-ghost btn-sm" href="/brand">Add pillars</a>
+</div>
+{% endif %}
+
+<div class="grid-main">
+    <div class="card card-pad">
+        <div class="card-head">
+            <div>
+                <div class="card-title" id="plan-title">This week's plan</div>
+                <div class="card-sub" id="plan-sub"></div>
+            </div>
+        </div>
+        <div id="plan-warnings"></div>
+        <div id="plan-list"></div>
+    </div>
+
+    <div class="stack">
+        <div class="card card-pad">
+            <div class="card-title">Plan a new week</div>
+            <label class="field-label">How many posts?</label>
+            <div class="chip-row" id="count-chips" style="display: flex; gap: 6px;">
+                {% for n in (3, 4, 5) %}<button type="button" class="chip {% if n == 4 %}active{% endif %}" data-n="{{ n }}">{{ n }}</button>{% endfor %}
+            </div>
+            <p class="tiny muted" style="margin-top: 6px;">3–5 a week works best. More than that and your posts compete with each other.</p>
+            <label class="field-label" for="focus">Anything to focus on? <span class="muted" style="font-weight: 400;">(optional)</span></label>
+            <textarea id="focus" class="field-input" rows="3" placeholder="e.g. We launch the retention audit on Thursday"></textarea>
+            <button type="button" class="btn btn-primary btn-md" style="margin-top: 14px;" onclick="planWeek(this)">Plan my week</button>
+        </div>
+
+        <div class="card card-pad" id="mix-card" hidden>
+            <div class="card-title">Pillar mix</div>
+            <div class="mix-bar" id="mix-bar"></div>
+            <div id="mix-legend" class="tiny" style="line-height: 1.9;"></div>
+            <p class="tiny muted" style="margin-top: 8px;">No pillar above 60%, and no formula twice in 7 days. The app checks both.</p>
+        </div>
+    </div>
+</div>
+
+<script>
+let PLAN = {{ plan|tojson }};
+const GOALS = {{ goals|tojson }};
+const FORMULA_NAMES = {{ formula_names|tojson }};
+const COLORS = ['#0071e3', '#12b76a', '#f79009', '#7a5af8', '#ee46bc', '#06aed4'];
+const $ = (id) => document.getElementById(id);
+let count = 4;
+
+document.querySelectorAll('#count-chips .chip').forEach(c => c.addEventListener('click', () => {
+    count = +c.dataset.n;
+    document.querySelectorAll('#count-chips .chip').forEach(x => x.classList.toggle('active', x === c));
+}));
+
+function colorFor(pillar) {
+    const names = PLAN ? [...new Set(PLAN.items.map(i => i.pillar))] : [];
+    return COLORS[Math.max(0, names.indexOf(pillar)) % COLORS.length];
+}
+
+function itemRow(i) {
+    const [day, time] = (i.slot_label || '').split(' · ');
+    let actions;
+    if (i.status === 'planned') actions = `
+        <button type="button" class="btn btn-primary btn-sm" onclick="draftItem(${i.id}, this)">Draft this</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="skipItem(${i.id}, this)">Skip</button>`;
+    else if (i.status === 'drafted') actions = `
+        <span class="q-badge q-ready"><span class="q-dot"></span>In your Queue</span>
+        <a class="link-accent tiny" href="/queue#post-${i.queued_post_id}">Review it →</a>`;
+    else actions = `<span class="q-badge q-none"><span class="q-dot"></span>Skipped</span>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="skipItem(${i.id}, this)">Restore</button>`;
+    return `
+        <div class="plan-row ${i.status === 'skipped' ? 'skipped' : ''}">
+            <div class="plan-when"><b>${esc(day || 'Unscheduled')}</b><span class="tiny muted">${esc(time || '')}</span></div>
+            <div style="min-width: 0;">
+                <div class="tiny muted" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <span><span class="pill-dot" style="background: ${colorFor(i.pillar)};"></span>${esc(i.pillar)}</span>
+                    <span>· ${esc((GOALS[i.goal] || {}).label || i.goal)}</span>
+                    ${i.formula_id ? `<span>· ${esc(i.formula_id)} ${esc(i.formula_name || FORMULA_NAMES[i.formula_id] || '')}</span>` : ''}
+                </div>
+                <div class="row-title" style="margin-top: 6px;">${esc(i.topic)}</div>
+                ${i.angle ? `<div class="tiny muted" style="margin-top: 3px;">${esc(i.angle)}</div>` : ''}
+                ${i.error ? `<div class="tiny" style="color: #b42318; margin-top: 4px;">${esc(i.error)}</div>` : ''}
+                <div class="row-actions">${actions}</div>
+            </div>
+        </div>`;
+}
+
+function render() {
+    if (!PLAN || !PLAN.items.length) {
+        $('plan-sub').textContent = '';
+        $('plan-warnings').innerHTML = '';
+        $('plan-list').innerHTML = `<div class="empty-state" style="padding: 36px 12px;">
+            <p class="empty-state-title">No plan yet</p>
+            <p class="empty-state-text">Plan a week and each post gets a day, a pillar, a goal and a proven formula. Nothing is written until you press Draft this.</p></div>`;
+        $('mix-card').hidden = true;
+        return;
+    }
+    const drafted = PLAN.items.filter(i => i.status === 'drafted').length;
+    $('plan-sub').textContent = `${PLAN.items.length} posts · ${drafted} drafted${PLAN.focus ? ' · Focus: ' + PLAN.focus : ''}`;
+    $('plan-warnings').innerHTML = PLAN.warnings.map(w => `<div class="banner warn" style="margin-bottom: 8px;">${esc(w)}</div>`).join('');
+    $('plan-list').innerHTML = PLAN.items.map(itemRow).join('');
+    const mix = Object.entries(PLAN.mix);
+    const total = mix.reduce((a, [, n]) => a + n, 0) || 1;
+    $('mix-card').hidden = !mix.length;
+    $('mix-bar').innerHTML = mix.map(([p, n]) => `<span style="width: ${100 * n / total}%; background: ${colorFor(p)};"></span>`).join('');
+    $('mix-legend').innerHTML = mix.map(([p, n]) => `<div><span class="pill-dot" style="background: ${colorFor(p)};"></span>${esc(p)} <span class="muted">· ${Math.round(100 * n / total)}%</span></div>`).join('');
+}
+
+async function planWeek(btn) {
+    if (PLAN && PLAN.items.some(i => i.status === 'planned')) {
+        const ok = await App.confirm({ title: 'Replace this plan?', message: 'Items you have not drafted yet will be replaced. Drafts already in your Queue stay there.', confirmText: 'Plan a new week' });
+        if (!ok) return;
+    }
+    App.busy(btn, true, 'Planning…');
+    try {
+        const r = await App.api('/api/plan/week', { method: 'POST', body: { count, focus: $('focus').value } });
+        PLAN = r.plan;
+        render();
+        showToast('Your week is planned');
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+function replaceItem(item) {
+    PLAN.items = PLAN.items.map(i => (i.id === item.id ? item : i));
+    render();
+}
+
+async function draftItem(id, btn) {
+    App.busy(btn, true, 'Writing…');
+    try {
+        const r = await App.api(`/api/plan/items/${id}/draft`, { method: 'POST' });
+        replaceItem(r.item);
+        showToast('Draft added to your Queue');
+    } catch (e) {
+        const cur = await App.api('/api/plan/current', { quiet: true }).catch(() => null);
+        if (cur && cur.plan) { PLAN = cur.plan; render(); }
+    } finally { App.busy(btn, false); }
+}
+
+async function skipItem(id, btn) {
+    App.busy(btn, true, '…');
+    try {
+        const r = await App.api(`/api/plan/items/${id}/skip`, { method: 'POST' });
+        replaceItem(r.item);
+        const cur = await App.api('/api/plan/current', { quiet: true }).catch(() => null);
+        if (cur && cur.plan) { PLAN = cur.plan; render(); }
+    } catch (e) { App.busy(btn, false); }
+}
+
+render();
+</script>
+{% endblock %}

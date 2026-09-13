@@ -7,7 +7,7 @@ from pathlib import Path
 import httpx
 from sqlalchemy.orm import Session
 
-from config import settings, get_anthropic_client
+from config import settings
 from database.models import ResearchItem
 
 logger = logging.getLogger(__name__)
@@ -62,7 +62,6 @@ class DeepResearcher:
 
     def __init__(self, db: Session):
         self.db = db
-        self.claude = get_anthropic_client()
 
     async def enrich_research_item(self, item_id: int) -> dict:
         """Fetch the source URL, extract data points, and take a screenshot.
@@ -100,24 +99,25 @@ class DeepResearcher:
     async def _extract_data_from_url(self, url: str) -> dict | None:
         """Fetch a URL and extract structured data using Claude."""
         try:
-            async with httpx.AsyncClient() as client:
-                resp = await client.get(url, timeout=15.0, follow_redirects=True)
-                if resp.status_code != 200:
-                    logger.warning("Failed to fetch %s: %s", url, resp.status_code)
-                    return None
+            from utils.netguard import fetch_public
 
-                # Extract text content (strip HTML tags roughly)
-                content = resp.text
-                if "<html" in content.lower():
-                    from bs4 import BeautifulSoup
-                    soup = BeautifulSoup(content, "html.parser")
-                    # Remove script and style elements
-                    for tag in soup(["script", "style", "nav", "footer", "header"]):
-                        tag.decompose()
-                    content = soup.get_text(separator="\n", strip=True)
+            resp = await fetch_public(url, timeout=15.0)
+            if resp.status_code != 200:
+                logger.warning("Failed to fetch %s: %s", url, resp.status_code)
+                return None
 
-                # Truncate to fit Claude context
-                content = content[:8000]
+            # Extract text content (strip HTML tags roughly)
+            content = resp.text
+            if "<html" in content.lower():
+                from bs4 import BeautifulSoup
+                soup = BeautifulSoup(content, "html.parser")
+                # Remove script and style elements
+                for tag in soup(["script", "style", "nav", "footer", "header"]):
+                    tag.decompose()
+                content = soup.get_text(separator="\n", strip=True)
+
+            # Truncate to fit Claude context
+            content = content[:8000]
 
         except Exception as e:
             logger.warning("Failed to fetch URL %s: %s", url, e)
@@ -125,17 +125,10 @@ class DeepResearcher:
 
         # Extract data with Claude
         try:
-            prompt = DATA_EXTRACTION_PROMPT.format(content=content)
-            message = self.claude.messages.create(
-                model=settings.CLAUDE_MODEL,
-                max_tokens=1000,
-                temperature=0.2,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            raw = message.content[0].text.strip()
-            if raw.startswith("```"):
-                raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-            return json.loads(raw)
+            import llm
+
+            prompt = DATA_EXTRACTION_PROMPT.format(content=llm.untrusted(content, "web_page"))
+            return llm.complete_json_loose("deep_research", prompt, brand=False, effort="low", max_tokens=4000)
         except Exception as e:
             logger.error("Data extraction failed for %s: %s", url, e)
             return None
@@ -143,6 +136,11 @@ class DeepResearcher:
     async def _take_screenshot(self, url: str, name_prefix: str) -> str | None:
         """Take a screenshot of a URL using Playwright."""
         if not settings.SCREEN_RECORD_ENABLED:
+            return None
+
+        from utils.netguard import is_public_url
+        if not is_public_url(url):
+            logger.warning("Screenshot blocked for non-public URL: %s", url)
             return None
 
         try:

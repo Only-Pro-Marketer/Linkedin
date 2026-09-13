@@ -266,49 +266,6 @@ class PerformanceTracker:
         return metrics
 
     # ------------------------------------------------------------------
-    # Sample / test data generation
-    # ------------------------------------------------------------------
-
-    def create_sample_performance_data(self) -> int:
-        """Generate realistic sample engagement data for testing.
-
-        Finds all POSTED posts that do **not** yet have a PostPerformance
-        record and creates one with plausible random numbers.
-
-        Returns the number of records created.
-        """
-        posts = (
-            self.db.query(QueuedPost)
-            .outerjoin(PostPerformance, PostPerformance.post_id == QueuedPost.id)
-            .filter(
-                QueuedPost.status == PostStatus.POSTED,
-                PostPerformance.id.is_(None),
-            )
-            .all()
-        )
-
-        if not posts:
-            logger.info("No POSTED posts without performance data found")
-            return 0
-
-        created = 0
-        for post in posts:
-            perf = PostPerformance(
-                post_id=post.id,
-                likes=random.randint(5, 150),
-                comments=random.randint(0, 25),
-                shares=random.randint(0, 15),
-                impressions=random.randint(100, 5000),
-                last_checked=datetime.utcnow(),
-            )
-            self.db.add(perf)
-            created += 1
-
-        self.db.commit()
-        logger.info("Created sample performance data for %d posts", created)
-        return created
-
-    # ------------------------------------------------------------------
     # Template stats & reporting (original methods)
     # ------------------------------------------------------------------
 

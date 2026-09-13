@@ -20,7 +20,7 @@ router = APIRouter(tags=["auth"])
 _oauth_states: dict[str, datetime] = {}
 _OAUTH_STATE_EXPIRY_MINUTES = 10
 
-SCOPES = ["openid", "profile", "w_member_social", "r_member_social"]
+SCOPES = settings.LINKEDIN_SCOPES.split()
 
 AUTHORIZATION_URL = "https://www.linkedin.com/oauth/v2/authorization"
 TOKEN_URL = "https://www.linkedin.com/oauth/v2/accessToken"
@@ -106,7 +106,7 @@ async def oauth_callback(
         access = token_data["access_token"]
         rest_headers = {
             "Authorization": f"Bearer {access}",
-            "LinkedIn-Version": "202602",
+            "LinkedIn-Version": settings.LINKEDIN_API_VERSION,
             "X-Restli-Protocol-Version": "2.0.0",
         }
 
@@ -173,7 +173,8 @@ async def oauth_callback(
         person_urn=person_urn,
         refresh_token=token_data.get("refresh_token"),
         refresh_token_expires_in=token_data.get("refresh_token_expires_in"),
-        scopes=" ".join(SCOPES),
+        # Store what LinkedIn actually granted (comma-separated in its response)
+        scopes=(token_data.get("scope") or " ".join(SCOPES)).replace(",", " "),
     )
 
     # Redirect to dashboard with success

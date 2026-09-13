@@ -64,7 +64,7 @@ function animateStats() {
 }
 
 // ── Auto-refresh queue ─────────────────────────────────────────
-if (window.location.pathname === '/') {
+if (window.location.pathname === '/queue') {
     setInterval(() => {
         if (typeof loadQueue === 'function') loadQueue();
     }, 60000);

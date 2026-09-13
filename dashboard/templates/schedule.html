@@ -395,7 +395,7 @@ async function submitSchedule() {
 }
 
 async function unschedulePost(postId) {
-    if (!confirm('Remove this post from the schedule? It will go back to Approved.')) return;
+    if (!confirm('Remove this post from the schedule?\n\nApproved posts go back to Approved; posts you never approved go back to the review queue.')) return;
     try {
         const res = await fetch(`/api/queue/${postId}/unschedule`, { method: 'POST' });
         if (res.ok) {
@@ -411,7 +411,11 @@ async function unschedulePost(postId) {
 }
 
 async function postNow(postId, btn) {
-    if (!confirm('Post this to LinkedIn right now?')) return;
+    if (!(await App.confirm({
+        title: 'Publish to LinkedIn now?',
+        message: 'This goes live on your profile immediately and cannot be undone.',
+        confirmText: 'Publish now',
+    }))) return;
     const origHtml = btn ? btn.innerHTML : '';
     if (btn) {
         btn.disabled = true;

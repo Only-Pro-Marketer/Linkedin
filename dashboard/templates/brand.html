@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Brand Voice{% endblock %}
+{% block page_title %}Brand Voice{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Brand Voice</h1>
+        <p>Everything Claude knows about you. Posts, comments and replies all follow this.</p>
+    </div>
+    <div style="min-width: 220px;">
+        <div class="tiny muted" style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span>Profile complete</span><b id="pct-label">{{ status.percent }}%</b>
+        </div>
+        <div class="progress"><span id="pct-bar" style="width: {{ status.percent }}%"></span></div>
+    </div>
+</div>
+
+{% if not status.filled %}
+<div class="card card-pad" style="margin-bottom: 20px; background: var(--accent-light); border-color: #cfe3fb;">
+    <div class="card-title">How to fill this in</div>
+    <p class="tiny muted" style="margin-top: 6px;">
+        Replace everything in <b>[square brackets]</b> with your own words, and delete lines that don't fit you.
+        A section gets a green check when no brackets are left. Until the five core sections are done,
+        drafts stay generic and never invent personal facts.
+    </p>
+</div>
+{% endif %}
+
+<details class="card card-pad" id="learn-voice" style="margin-bottom: 20px;">
+    <summary style="cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 12px;">
+        <div>
+            <div class="card-title">Learn my voice</div>
+            <div class="card-sub">Paste 3–6 of your own posts. Claude describes how you write and suggests the voice sections for you to review.</div>
+        </div>
+        <span class="btn btn-ghost btn-sm">Open</span>
+    </summary>
+    <div style="margin-top: 14px;">
+        <textarea id="lv-text" class="field-input" rows="10" placeholder="Paste your posts here, with a line of --- between them."></textarea>
+        <div class="row-actions">
+            <button type="button" class="btn btn-primary btn-md" onclick="learnVoice(this)">Analyze my posts</button>
+            <span class="tiny muted" id="lv-count"></span>
+        </div>
+        <div id="lv-result" style="margin-top: 14px;"></div>
+    </div>
+</details>
+
+<div class="brand-layout">
+    <nav class="brand-nav card card-pad" style="padding: 10px;">
+        {% for s in editor.guided %}
+        <a href="#sec-{{ loop.index }}" data-nav="{{ loop.index }}">
+            <span class="check {% if s.done %}done{% endif %}">{% if s.done %}<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>{% endif %}</span>
+            {{ s.title }}
+        </a>
+        {% endfor %}
+        {% if editor.other %}<a href="#sec-other"><span class="check"></span>Other sections</a>{% endif %}
+    </nav>
+
+    <div class="stack" id="sections">
+        {% for s in editor.guided %}
+        <section class="card card-pad brand-section" id="sec-{{ loop.index }}">
+            <div class="card-head" style="align-items: flex-start;">
+                <div>
+                    <div class="card-title">{{ s.title }}</div>
+                    <div class="card-sub">{{ s.hint }}</div>
+                </div>
+                <button type="button" class="btn btn-ghost btn-sm" onclick="stripExamples(this)" title="Delete lines that still contain [brackets]">Remove template lines</button>
+            </div>
+            <textarea data-title="{{ s.title }}" data-nav="{{ loop.index }}" rows="7" placeholder="{{ s.example }}">{{ s.body }}</textarea>
+            {% if s.example %}
+            <details style="margin-top: 8px;">
+                <summary class="tiny muted" style="cursor: pointer;">See an example</summary>
+                <pre class="tiny muted" style="white-space: pre-wrap; margin-top: 6px; font-family: inherit;">{{ s.example }}</pre>
+            </details>
+            {% endif %}
+        </section>
+        {% endfor %}
+
+        {% if editor.other %}
+        <section class="card card-pad" id="sec-other">
+            <details>
+                <summary class="card-title" style="cursor: pointer;">Other sections</summary>
+                <p class="card-sub" style="margin: 6px 0 12px;">Kept from your soul.md. Edit if you like.</p>
+                {% for s in editor.other %}
+                <div class="brand-section" style="margin-top: 14px;">
+                    <div class="row-title" style="margin-bottom: 6px;">{{ s.title }}</div>
+                    <textarea data-title="{{ s.title }}" rows="6">{{ s.body }}</textarea>
+                </div>
+                {% endfor %}
+            </details>
+        </section>
+        {% endif %}
+
+        <div class="savebar" id="savebar" hidden>
+            <span class="tiny">You have unsaved changes</span>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn btn-sm" style="background: rgba(255,255,255,.12); color: #fff;" onclick="location.reload()">Discard</button>
+                <button class="btn btn-sm" style="background: #fff; color: #111;" id="save-btn" onclick="saveBrand()">Save changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const PLACEHOLDER = /\[[^\]\n]{3,}\]/;
+let dirty = false;
+
+function markDirty() {
+    dirty = true;
+    document.getElementById('savebar').hidden = false;
+}
+
+function refreshChecks() {
+    document.querySelectorAll('textarea[data-nav]').forEach(ta => {
+        const done = ta.value.trim() && !PLACEHOLDER.test(ta.value);
+        const nav = document.querySelector(`.brand-nav a[data-nav="${ta.dataset.nav}"] .check`);
+        if (!nav) return;
+        nav.classList.toggle('done', !!done);
+        nav.innerHTML = done ? '<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>' : '';
+    });
+}
+
+function stripExamples(btn) {
+    const ta = btn.closest('.brand-section').querySelector('textarea');
+    const kept = ta.value.split('\n').filter(line => !PLACEHOLDER.test(line));
+    ta.value = kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    ta.focus();
+    markDirty();
+    refreshChecks();
+}
+
+async function saveBrand() {
+    const btn = document.getElementById('save-btn');
+    const sections = {};
+    document.querySelectorAll('textarea[data-title]').forEach(ta => { sections[ta.dataset.title] = ta.value; });
+    App.busy(btn, true, 'Saving…');
+    try {
+        const r = await App.api('/api/brand', { method: 'POST', body: { sections } });
+        dirty = false;
+        document.getElementById('savebar').hidden = true;
+        document.getElementById('pct-label').textContent = r.status.percent + '%';
+        document.getElementById('pct-bar').style.width = r.status.percent + '%';
+        showToast(r.status.filled ? 'Brand voice saved — new drafts will use it' : `Saved · ${r.status.percent}% complete`);
+    } finally {
+        App.busy(btn, false);
+    }
+}
+
+document.querySelectorAll('textarea[data-title]').forEach(ta => {
+    ta.addEventListener('input', () => { markDirty(); refreshChecks(); });
+    ta.addEventListener('focus', () => {
+        // First focus on an untouched template section: select it so typing replaces it
+        if (PLACEHOLDER.test(ta.value) && !ta.dataset.touched) { ta.dataset.touched = '1'; }
+    });
+});
+document.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (dirty) saveBrand(); }
+});
+window.addEventListener('beforeunload', (e) => { if (dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+// ── Learn my voice ──────────────────────────────────
+const lvText = document.getElementById('lv-text');
+let LV = null;
+lvText.addEventListener('input', () => {
+    const n = lvText.value.split(/^\s*-{3,}\s*$/m).filter(s => s.trim().length >= 150).length;
+    document.getElementById('lv-count').textContent = n ? `${n} post${n === 1 ? '' : 's'} detected` : '';
+});
+
+async function learnVoice(btn) {
+    App.busy(btn, true, 'Reading your posts…');
+    try {
+        LV = await App.api('/api/brand/learn-voice', { method: 'POST', body: { text: lvText.value } });
+        document.getElementById('lv-result').innerHTML = `
+            ${LV.dropped_lines ? `<p class="tiny muted">Left out ${LV.dropped_lines} suggested line${LV.dropped_lines === 1 ? '' : 's'} that weren't word for word from your posts.</p>` : ''}
+            ${LV.sections.map((s, i) => `
+                <div style="border-top: 1px solid var(--border-primary); padding-top: 12px; margin-top: 12px;">
+                    <label style="display: flex; gap: 8px; align-items: center; cursor: pointer;">
+                        <input type="checkbox" data-lv="${i}" checked><span class="row-title">${esc(s.title)}</span>
+                    </label>
+                    <div class="grid-2" style="margin-top: 8px; gap: 14px;">
+                        <div><div class="tiny muted" style="margin-bottom: 4px;">Now</div>
+                            <pre class="tiny" style="white-space: pre-wrap; font-family: inherit; margin: 0; color: var(--text-secondary);">${esc(s.current || '(empty)')}</pre></div>
+                        <div><div class="tiny muted" style="margin-bottom: 4px;">Suggested</div>
+                            <pre class="tiny" style="white-space: pre-wrap; font-family: inherit; margin: 0;">${esc(s.proposed)}</pre></div>
+                    </div>
+                </div>`).join('')}
+            <div class="row-actions" style="margin-top: 14px;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="applyVoice()">Put checked sections in the editor</button>
+                <span class="tiny muted">Nothing is saved until you press Save changes.</span>
+            </div>`;
+    } catch (e) { /* toast shown */ } finally { App.busy(btn, false); }
+}
+
+function applyVoice() {
+    let n = 0;
+    document.querySelectorAll('[data-lv]:checked').forEach(cb => {
+        const s = LV.sections[+cb.dataset.lv];
+        const ta = document.querySelector(`textarea[data-title="${CSS.escape(s.title)}"]`);
+        if (ta) { ta.value = s.proposed; n++; }
+    });
+    if (n) {
+        markDirty();
+        refreshChecks();
+        showToast(`${n} section${n === 1 ? '' : 's'} updated. Review them, then press Save changes.`);
+    }
+}
+</script>
+{% endblock %}

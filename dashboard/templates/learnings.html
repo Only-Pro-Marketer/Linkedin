@@ -192,8 +192,8 @@ function renderInsight(i) {
                 ${i.is_active ? 'Deactivate' : 'Activate'}
             </button>
         </div>
-        <p class="text-sm text-gray-900 font-medium mb-1">${i.insight_text}</p>
-        <p class="text-xs text-gray-500 mb-3 italic">"${i.prompt_directive}"</p>
+        <p class="text-sm text-gray-900 font-medium mb-1">${esc(i.insight_text)}</p>
+        <p class="text-xs text-gray-500 mb-3 italic">"${esc(i.prompt_directive)}"</p>
         <div class="flex items-center gap-4 text-xs text-gray-400">
             <div class="flex items-center gap-1.5">
                 <span>Confidence:</span>
@@ -418,6 +418,7 @@ async function runAutoresearch() {
     try {
         const res = await fetch('/api/autoresearch/run', { method: 'POST' });
         const data = await res.json();
+        if (!res.ok) { showToast(data.error || 'Autoresearch could not run', 'error'); return; }
         showToast(`Autoresearch complete: ${data.experiments_run} experiments, check results below`);
         loadExperimentsSummary();
         loadRecentExperiments();

@@ -265,7 +265,7 @@ function renderProfile() {
     document.getElementById('profile-name').textContent = p.name;
 
     if (p.profile_picture) {
-        document.getElementById('profile-avatar').innerHTML = `<img src="${p.profile_picture}" class="w-16 h-16 rounded-full object-cover" style="aspect-ratio:1/1;" alt="${esc(p.name)}">`;
+        document.getElementById('profile-avatar').innerHTML = `<img src="${safeUrl(p.profile_picture)}" class="w-16 h-16 rounded-full object-cover" style="aspect-ratio:1/1;" alt="${esc(p.name)}">`;
     } else {
         const initials = p.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
         document.getElementById('avatar-initials').textContent = initials;
@@ -381,7 +381,7 @@ function renderTopPosts() {
                     <span class="text-[11px] text-violet-600 font-medium">${p.shares} shares</span>
                     ${p.hook_style ? `<span class="badge bg-violet-50 text-violet-600 text-[9px]">${fmtLabel(p.hook_style)}</span>` : ''}
                     ${p.content_format ? `<span class="badge bg-blue-50 text-blue-600 text-[9px]">${fmtLabel(p.content_format)}</span>` : ''}
-                    ${p.post_url ? `<a href="${p.post_url}" target="_blank" class="text-[10px] text-blue-500 hover:text-blue-700">View</a>` : ''}
+                    ${p.post_url ? `<a href="${safeUrl(p.post_url)}" target="_blank" class="text-[10px] text-blue-500 hover:text-blue-700">View</a>` : ''}
                 </div>
             </div>
             <div class="text-right flex-shrink-0">
@@ -625,7 +625,7 @@ function renderAllPosts(posts) {
                 </div>
                 <div class="flex items-center gap-2 flex-shrink-0">
                     ${date ? `<span class="text-[10px] text-gray-400">${date}</span>` : ''}
-                    ${p.post_url ? `<a href="${p.post_url}" target="_blank" class="text-[10px] text-blue-500 hover:text-blue-700">View on LI</a>` : ''}
+                    ${p.post_url ? `<a href="${safeUrl(p.post_url)}" target="_blank" class="text-[10px] text-blue-500 hover:text-blue-700">View on LI</a>` : ''}
                 </div>
             </div>
 

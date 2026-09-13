@@ -296,7 +296,7 @@ class PatternAnalyzer:
                     prompt_directive=f"The '{template}' template structure works well — it gets {pct}% more engagement.",
                     confidence=_confidence_from_sample(n, effect_size),
                     sample_size=n,
-                    evidence={"template": template, "avg_score": round(avg, 1), "overall_avg": round(overall_avg, 1)},
+                    evidence={"template": template, "avg_score": round(avg, 1), "overall_avg": round(overall_avg, 1), "ratio": round(ratio, 3)},
                 )
                 created += c
                 updated += u
@@ -652,7 +652,7 @@ class PatternAnalyzer:
         """Extract tone from a generation prompt string."""
         if not prompt:
             return None
-        match = re.search(r"TONE:\s*(\w[\w\s-]*\w)", prompt)
+        match = re.search(r"TONE:[ \t]*([^\n]+)", prompt)
         if match:
             return match.group(1).strip().lower()
         return None

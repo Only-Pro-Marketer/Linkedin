@@ -4,12 +4,12 @@ import logging
 import re
 from datetime import datetime
 
-import anthropic
-from apify_client import ApifyClient
 from sqlalchemy.orm import Session
 
-from config import settings, get_anthropic_client
+import llm
+from config import settings  # noqa: F401
 from database.models import Competitor, CompetitorPost
+from research.apify_linkedin import NO_TOKEN, ApifyError, available, run_actor_items
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,12 @@ class CompetitorScraper:
 
     def __init__(self, db: Session):
         self.db = db
-        self.apify = ApifyClient(settings.APIFY_TOKEN)
-        self.claude = get_anthropic_client()
 
     def scrape_all_competitors(self) -> dict:
         """Run a full scrape cycle for all active competitors."""
+        if not available():
+            logger.info("Competitor scrape skipped: no APIFY_TOKEN")
+            return {"scraped": 0, "new_posts": 0, "analyzed": 0, "errors": [{"competitor": "all", "error": NO_TOKEN}]}
         competitors = (
             self.db.query(Competitor)
             .filter(Competitor.is_active.is_(True))
@@ -84,7 +85,9 @@ class CompetitorScraper:
         return results
 
     def scrape_competitor(self, comp: Competitor) -> int:
-        """Scrape a single competitor's profile and recent posts."""
+        """Scrape a single competitor's profile and recent posts. Raises ApifyError if fetching fails."""
+        if not available():
+            raise ApifyError(NO_TOKEN)
         username = comp.linkedin_username or _extract_username(comp.linkedin_url or "")
         if not username:
             raise ValueError(f"No LinkedIn username found for {comp.name}")
@@ -122,13 +125,7 @@ class CompetitorScraper:
     def _fetch_profile(self, comp: Competitor, profile_url: str):
         """Fetch the competitor's LinkedIn profile info via Apify."""
         try:
-            run = self.apify.actor(PROFILE_ACTOR).call(
-                run_input={"profileUrls": [profile_url]},
-                timeout_secs=120,
-            )
-
-            dataset = self.apify.dataset(run["defaultDatasetId"])
-            items = list(dataset.iterate_items())
+            items = run_actor_items(PROFILE_ACTOR, {"profileUrls": [profile_url]}, timeout_s=120)
 
             if not items:
                 logger.warning("No profile data returned for %s", profile_url)
@@ -156,37 +153,24 @@ class CompetitorScraper:
             logger.warning("Profile fetch error for %s: %s", profile_url, e)
 
     def _fetch_posts(self, comp: Competitor, profile_url: str, max_posts: int = 20) -> int:
-        """Fetch recent posts via Apify and store new ones."""
-        try:
-            run = self.apify.actor(POSTS_ACTOR).call(
-                run_input={
-                    "targetUrls": [profile_url],
-                    "maxPosts": max_posts,
-                    "scrapeReactions": False,
-                    "scrapeComments": False,
-                },
-                timeout_secs=300 if max_posts > 50 else 180,
-            )
-
-            dataset = self.apify.dataset(run["defaultDatasetId"])
-            items = list(dataset.iterate_items())
-
-            if not items:
-                logger.warning("No posts returned for %s", profile_url)
-                return 0
-
-            new_count = 0
-            for raw_post in items:
-                if self._store_post(comp, raw_post):
-                    new_count += 1
-
-            self.db.commit()
-            logger.info("Fetched %d new posts for %s", new_count, comp.name)
-            return new_count
-
-        except Exception as e:
-            logger.warning("Posts fetch error for %s: %s", profile_url, e)
+        """Fetch recent posts via Apify and store new ones. Raises ApifyError if the fetch fails."""
+        items = run_actor_items(
+            POSTS_ACTOR,
+            {"targetUrls": [profile_url], "maxPosts": max_posts, "scrapeReactions": False, "scrapeComments": False},
+            timeout_s=300 if max_posts > 50 else 180,
+        )
+        if not items:
+            logger.warning("No posts returned for %s", profile_url)
             return 0
+
+        new_count = 0
+        for raw_post in items:
+            if self._store_post(comp, raw_post):
+                new_count += 1
+
+        self.db.commit()
+        logger.info("Fetched %d new posts for %s", new_count, comp.name)
+        return new_count
 
     def _store_post(self, comp: Competitor, raw: dict) -> bool:
         """Parse a raw Apify post and store it if it's new."""
@@ -321,32 +305,25 @@ class CompetitorScraper:
 
     def _analyze_post(self, post: CompetitorPost, competitor_name: str):
         """Use Claude to deeply analyze a competitor post."""
-        prompt = f"""Analyze this LinkedIn post from competitor "{competitor_name}" and provide a structured breakdown.
+        from content.brand import get_niche
 
-POST CONTENT:
----
-{post.content}
----
+        prompt = f"""Analyze this LinkedIn post by "{competitor_name}" and give a structured breakdown.
+
+{llm.untrusted(post.content, "competitor_post")}
 
 ENGAGEMENT: {post.likes} likes, {post.comments} comments, {post.shares} shares
 
-Respond in EXACTLY this format (fill in each field, keep answers concise):
+Respond in EXACTLY this format (one line per field, concise):
 
 HOOK_STYLE: [one of: bold_statement, question, story, statistic, contrarian, listicle, personal, how_to, curiosity_gap, challenge]
 CONTENT_FORMAT: [one of: list, story, framework, tips, case_study, opinion, educational, motivational, behind_the_scenes, comparison]
 TOPIC: [main topic in 3-5 words]
-KEY_TAKEAWAY: [the core insight readers got from this post, 1-2 sentences]
-WHY_IT_WORKS: [why this post got good engagement — be specific about the psychological triggers, format choices, and content strategy, 2-3 sentences]
-HOW_TO_RECREATE: [step-by-step guide on how I can write a similar post for my niche (supplements and health e-commerce) — include the structure to follow, hook template, and content angle to use, 3-4 sentences]"""
+KEY_TAKEAWAY: [the core insight readers got, 1-2 sentences]
+WHY_IT_WORKS: [specific reasons it earned engagement: hook, format, triggers — 2-3 sentences]
+HOW_TO_RECREATE: [how to write an original post with the same structure for this niche: {get_niche()} — structure, hook template, angle; 3-4 sentences]"""
 
         try:
-            message = self.claude.messages.create(
-                model=settings.CLAUDE_MODEL,
-                max_tokens=800,
-                temperature=0.3,
-                messages=[{"role": "user", "content": prompt}],
-            )
-            result = message.content[0].text.strip()
+            result = llm.complete("competitor_analysis", prompt, brand=False, effort="low", max_tokens=3000).text
 
             # Parse the structured response
             fields = {}
@@ -366,8 +343,8 @@ HOW_TO_RECREATE: [step-by-step guide on how I can write a similar post for my ni
 
             logger.info("Analyzed post #%s: hook=%s, format=%s", post.id, post.hook_style, post.content_format)
 
-        except anthropic.APIError as e:
-            logger.error("Claude API error analyzing post %s: %s", post.id, e)
+        except llm.LLMError as e:
+            logger.error("AI analysis failed for post %s: %s", post.id, e)
         except Exception as e:
             logger.error("Analysis error for post %s: %s", post.id, e)
 

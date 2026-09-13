@@ -1,0 +1,185 @@
+{% extends "base.html" %}
+
+{% block title %}Home{% endblock %}
+{% block page_title %}Home{% endblock %}
+
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>{{ greeting }}{% if first_name %}, {{ first_name }}{% endif %}</h1>
+        <p>{{ today }} · Here's what needs you today.</p>
+    </div>
+    <div class="page-actions">
+        <a href="{{ nav_create[0].href }}" class="btn btn-primary btn-md">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+            Write a post
+        </a>
+        <button class="btn btn-ghost btn-md" id="gen-btn" onclick="generateDrafts(this)">Generate 3 drafts</button>
+    </div>
+</div>
+
+{% if checklist_done < checklist|length %}
+<div class="card card-pad fade-in-up" style="margin-bottom: 20px;">
+    <div class="card-head">
+        <div>
+            <div class="card-title">Finish setting up</div>
+            <div class="card-sub">{{ checklist_done }} of {{ checklist|length }} done</div>
+        </div>
+        <div class="progress" style="width: 180px;"><span style="width: {{ (100 * checklist_done / checklist|length)|round|int }}%"></span></div>
+    </div>
+    {% for item in checklist %}
+    <div class="checklist-item">
+        <span class="check {% if item.done %}done{% endif %}">
+            {% if item.done %}<svg fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M5 13l4 4L19 7"/></svg>{% endif %}
+        </span>
+        <div style="flex: 1; min-width: 0;">
+            <div class="row-title" style="{% if item.done %}color: var(--text-secondary); text-decoration: line-through;{% endif %}">{{ item.title }}</div>
+            {% if not item.done %}<div class="tiny muted">{{ item.desc }}</div>{% endif %}
+        </div>
+        {% if not item.done and item.href %}<a href="{{ item.href }}" class="btn btn-ghost btn-sm">{{ item.cta }}</a>{% endif %}
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="grid-4 fade-in-up" style="margin-bottom: 20px;">
+    <a href="/queue" class="card metric">
+        <div class="metric-label">To review</div>
+        <div class="metric-value">{{ stats.get('queued', 0) }}</div>
+        <div class="metric-sub">drafts waiting for you</div>
+    </a>
+    <a href="/schedule" class="card metric">
+        <div class="metric-label">Ready to post</div>
+        <div class="metric-value">{{ stats.get('approved', 0) + stats.get('scheduled', 0) }}</div>
+        <div class="metric-sub">approved or scheduled</div>
+    </a>
+    <a href="/history" class="card metric">
+        <div class="metric-label">Published · 7 days</div>
+        <div class="metric-value">{{ published_week }}</div>
+        <div class="metric-sub">limit {{ posts_per_day }} per day</div>
+    </a>
+    <a href="/settings" class="card metric">
+        <div class="metric-label">AI usage · 30 days</div>
+        <div class="metric-value">{% if usage.cost_usd is not none %}${{ '%.2f'|format(usage.cost_usd) }}{% else %}{{ usage.calls }}{% endif %}</div>
+        <div class="metric-sub">{{ usage.calls }} Claude calls</div>
+    </a>
+</div>
+
+{% if failed %}
+<a href="/history?tab=failed" class="card card-pad fade-in-up" style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; text-decoration: none; border-color: #fecdca; background: #fffbfa;">
+    <span class="q-badge q-fix"><span class="q-dot"></span>{{ failed }} failed</span>
+    <span class="row-title">{{ failed }} post{{ 's' if failed != 1 }} could not be published. See why and retry.</span>
+    <span class="link-accent" style="margin-left: auto;">Open →</span>
+</a>
+{% endif %}
+
+<div class="grid-main">
+    <div class="card card-pad fade-in-up">
+        <div class="card-head">
+            <div>
+                <div class="card-title">Ready for your review</div>
+                <div class="card-sub">Best-quality drafts first</div>
+            </div>
+            <a href="/queue" class="link-accent">Open Queue →</a>
+        </div>
+        {% if review %}
+            {% for item in review %}
+            <div class="row-item">
+                <div class="row-main">
+                    <div class="row-title line-clamp-2">{{ item.hook }}</div>
+                    <div class="tiny muted" style="margin-top: 6px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        {% if item.quality %}
+                            <span class="q-badge q-{{ item.quality.status }}"><span class="q-dot"></span>{{ {'ready': 'Ready', 'review': 'Review', 'fix': 'Needs fixes'}[item.quality.status] }} · {{ item.quality.score }}</span>
+                        {% else %}
+                            <span class="q-badge q-none"><span class="q-dot"></span>Not checked</span>
+                        {% endif %}
+                        <span>{{ item.template }}</span>
+                        {% if item.virality %}<span>· reach {{ item.virality }}/100</span>{% endif %}
+                    </div>
+                </div>
+                <a href="/queue#post-{{ item.id }}" class="btn btn-ghost btn-sm">Review</a>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty-state" style="padding: 36px 12px;">
+                <p class="empty-state-title">Nothing waiting</p>
+                <p class="empty-state-text">Write a post, or let the app draft a few for you.</p>
+                <button class="btn btn-primary btn-sm" onclick="generateDrafts(this)">Generate 3 drafts</button>
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="stack">
+        <div class="card card-pad fade-in-up">
+            <div class="card-head">
+                <div class="card-title">Coming up</div>
+                <a href="/schedule" class="link-accent">Schedule →</a>
+            </div>
+            {% if upcoming %}
+                {% for p in upcoming %}
+                <div class="row-item">
+                    <div class="row-main">
+                        <div class="tiny muted">{{ p.when }}</div>
+                        <div class="row-title line-clamp-2" style="margin-top: 2px;">{{ p.hook }}</div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <p class="tiny muted" style="margin-bottom: 8px;">Nothing scheduled. Approved posts go out at your next posting slots:</p>
+            {% endif %}
+            {% if slots %}
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                {% for s in slots %}<span class="chip" style="cursor: default;">{{ s }}</span>{% endfor %}
+            </div>
+            {% endif %}
+            <p class="tiny muted" style="margin-top: 10px;">Times shown in {{ posting_timezone }}.</p>
+        </div>
+
+        <a href="/engage{% if engage.needs_you or engage.pending %}#activity{% elif engage.followups %}#followups{% endif %}" class="card card-pad fade-in-up" style="display: block; text-decoration: none; color: inherit;">
+            <div class="card-head">
+                <div class="card-title">Engage</div>
+                <span class="link-accent">Open →</span>
+            </div>
+            {% if engage.needs_you or engage.pending or engage.followups %}
+            <div class="tiny" style="line-height: 1.9;">
+                {% if engage.needs_you %}<div><span class="q-badge q-review"><span class="q-dot"></span>{{ engage.needs_you }}</span> waiting for you to post or check</div>{% endif %}
+                {% if engage.pending %}<div>{{ engage.pending }} comment{{ 's' if engage.pending != 1 }} scheduled</div>{% endif %}
+                {% if engage.followups %}<div>{{ engage.followups }} comment{{ 's' if engage.followups != 1 }} to follow up on</div>{% endif %}
+                <div class="muted">{{ engage.published_today }} / {{ engage.cap }} posted today</div>
+            </div>
+            {% else %}
+            <p class="tiny muted">Comment on a few posts in your niche today. Nothing posts until you approve it.</p>
+            {% endif %}
+        </a>
+
+        {% if not brand.filled %}
+        <div class="card card-pad fade-in-up" style="background: var(--accent-light); border-color: #cfe3fb;">
+            <div class="card-title">Make drafts sound like you</div>
+            <p class="tiny muted" style="margin-top: 6px;">Your brand voice is {{ brand.percent }}% complete. Until it is filled in, drafts stay generic and avoid personal facts.</p>
+            <a href="/brand" class="btn btn-primary btn-sm" style="margin-top: 12px;">Finish Brand Voice</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+async function generateDrafts(btn) {
+    const ok = await App.confirm({
+        title: 'Generate 3 drafts?',
+        message: 'Claude writes 3 posts from your research and templates, checks them, and adds them to your Queue. This takes about a minute and uses AI credits.',
+        confirmText: 'Generate',
+    });
+    if (!ok) return;
+    App.busy(btn, true, 'Writing…');
+    try {
+        const r = await App.api('/api/generate', { method: 'POST', body: { count: 3 } });
+        showToast(`${r.count} draft${r.count === 1 ? '' : 's'} added to your Queue`);
+        setTimeout(() => location.reload(), 900);
+    } catch (e) {
+        /* toast already shown */
+    } finally {
+        App.busy(btn, false);
+    }
+}
+</script>
+{% endblock %}
