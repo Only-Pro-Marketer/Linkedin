@@ -116,7 +116,7 @@ All drafts waiting for review. Each card shows its quality badge, predicted reac
 - **Schedule** for a specific time, or **Post Now** (confirmation required).
 
 ### Schedule
-A calendar of scheduled posts and your posting slots.
+A calendar of scheduled posts and your posting times, starting today. Times that have passed show as *Passed* and can't be picked. **Schedule a Post** opens on your next free posting time.
 
 ### History
 Published, approved, rejected and failed posts.
@@ -186,7 +186,7 @@ LinkedIn connection and what your permissions allow, **Test connection**, limits
 
 | Setting | Where | Default | Notes |
 |---|---|---|---|
-| `POSTS_PER_DAY` | Settings / .env | 1 | Hard cap on every publish path |
+| `POSTS_PER_DAY` | Settings / .env | 1 | Hard cap on every publish path (1–100) |
 | `MIN_HOURS_BETWEEN_POSTS` | Settings / .env | 3 | Automatic publishing only |
 | `MIN_QUEUE_SIZE` | Settings / .env | 10 | Automatic drafting pauses when the Queue has this many |
 | `ENGAGE_DAILY_CAP` | Settings / .env | 30 | Comments and replies per day |
@@ -225,6 +225,7 @@ LinkedIn connection and what your permissions allow, **Test connection**, limits
 | Scrape Now says it needs an Apify token | Add `APIFY_TOKEN` to `.env` and restart, or paste posts by hand. |
 | Gen Image fails | Check `KIE_API_KEY` or `GEMINI_API_KEY`, and your kie.ai credits. The error message says which. |
 | Drafts sound generic | Finish Brand Voice (all five core sections green) and add real facts in Studio's notes. |
+| "That time has already passed" | Pick a later date or time. The Schedule page only offers future times. |
 | A post is stuck in "Failed" | Open History → Failed to see why, fix the cause, and click Retry. |
 | An Engage item says "Check on LinkedIn" | Open the post. If your comment is there, click *It posted*; otherwise click *Retry*. |
 | Autoresearch won't run | It needs `AUTORESEARCH_ENABLED` on and 10 published posts. |

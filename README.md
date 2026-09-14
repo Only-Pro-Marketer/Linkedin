@@ -128,7 +128,7 @@ Secrets live in `.env`. Limits and toggles can also be changed in **Settings**; 
 
 | Setting | Default | What it does |
 |---|---|---|
-| `POSTS_PER_DAY` | 1 | Hard cap on publishes per day |
+| `POSTS_PER_DAY` | 1 | Hard cap on publishes per day (1–100) |
 | `MIN_HOURS_BETWEEN_POSTS` | 3 | Gap between automatic publishes |
 | `ENGAGE_DAILY_CAP` | 30 | Comments and replies per day |
 | `SCHEDULER_ENABLED` | true | Background jobs on or off |
