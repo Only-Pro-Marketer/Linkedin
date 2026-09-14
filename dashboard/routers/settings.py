@@ -16,7 +16,7 @@ from linkedin.api_client import LinkedInAPIClient
 router = APIRouter(tags=["settings"])
 
 FIELDS = [
-    {"key": "POSTS_PER_DAY", "label": "Posts per day", "type": "int", "min": 1, "max": 5,
+    {"key": "POSTS_PER_DAY", "label": "Posts per day", "type": "int", "min": 1, "max": 100,
      "help": "Hard cap on publishes per day, on every path (Post now included)."},
     {"key": "MIN_HOURS_BETWEEN_POSTS", "label": "Hours between automatic posts", "type": "float", "min": 0, "max": 24,
      "help": "Scheduled publishing waits at least this long after your last post."},

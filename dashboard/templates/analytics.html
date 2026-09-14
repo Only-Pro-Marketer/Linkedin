@@ -68,11 +68,11 @@
 <!-- Row: Timeline + Next Posting Slots -->
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 mb-8">
     <div class="glass-card p-8 lg:col-span-2" id="profile-chart-section" style="display:none;">
-        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Posting Timeline</h3>
+        <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Posting Timeline</h3>
         <div style="height:220px"><canvas id="profile-timeline-chart"></canvas></div>
     </div>
     <div class="glass-card p-8">
-        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">Next Posting Slots</h3>
+        <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 12px;">Next Posting Slots</h3>
         <div id="next-slots-container" class="space-y-2">
             <p style="color: var(--text-muted);" class="text-sm">Loading...</p>
         </div>
@@ -88,11 +88,11 @@
 <!-- Row: Template Performance + Best Posting Times -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
     <div class="glass-card p-8">
-        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Template Performance</h3>
+        <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Template Performance</h3>
         <div style="height:220px"><canvas id="template-chart"></canvas></div>
     </div>
     <div class="glass-card p-8">
-        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Best Posting Times</h3>
+        <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary); margin-bottom: 16px;">Best Posting Times</h3>
         <div id="heatmap-container" class="overflow-x-auto"></div>
     </div>
 </div>
@@ -100,7 +100,7 @@
 <!-- Hook Library Stats -->
 <div class="glass-card p-8 mb-8" id="hooks-stats-card">
     <div class="flex items-center justify-between mb-4">
-        <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary);">Hook Library</h3>
+        <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary);">Hook Library</h3>
         <button onclick="extractHooks()" id="extract-hooks-btn" class="btn btn-ghost btn-sm">Extract New Hooks</button>
     </div>
     <div id="hooks-summary" class="grid grid-cols-2 sm:grid-cols-4 gap-5">
@@ -112,7 +112,7 @@
 <div class="glass-card overflow-hidden" id="my-posts-section">
     <div class="px-8 py-6" style="border-bottom: 1px solid var(--border-primary); display: flex; align-items: center; justify-content: space-between;">
         <div>
-            <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary);">My LinkedIn Posts</h3>
+            <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary);">My LinkedIn Posts</h3>
             <p class="stat-subtext" style="margin-top: 4px;">Ranked by engagement — click for details</p>
         </div>
         <div class="flex gap-3 items-center">
@@ -140,7 +140,7 @@
     <div class="modal-content fade-in">
         <div class="p-8">
             <div class="flex items-center justify-between mb-6">
-                <h3 style="font-size: 22px; font-weight: 600; color: var(--text-primary);">Post Details</h3>
+                <h3 style="font-size: 16px; font-weight: 600; color: var(--text-primary);">Post Details</h3>
                 <button onclick="document.getElementById('post-detail-modal').classList.add('hidden'); document.getElementById('post-detail-modal').style.display='none';" class="w-8 h-8 flex items-center justify-center" style="border-radius: var(--radius-sm); border: none; background: none; cursor: pointer; color: var(--text-muted);">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>

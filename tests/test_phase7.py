@@ -42,7 +42,7 @@ def test_settings_save_and_validate(client):
     r = client.post("/api/settings", json={"values": {"POSTS_PER_DAY": 2, "AUTO_REPAIR": False}})
     assert r.status_code == 200, r.text
     assert settings.POSTS_PER_DAY == 2 and settings.AUTO_REPAIR is False
-    assert client.post("/api/settings", json={"values": {"POSTS_PER_DAY": 99}}).status_code == 400
+    assert client.post("/api/settings", json={"values": {"POSTS_PER_DAY": 101}}).status_code == 400
     assert client.post("/api/settings", json={"values": {"ANTHROPIC_API_KEY": "x"}}).status_code == 400
     assert client.post("/api/settings", json={"values": {"AUTO_REPAIR": 1}}).status_code == 400
 

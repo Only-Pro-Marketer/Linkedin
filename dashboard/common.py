@@ -1,5 +1,6 @@
 """Shared helpers for dashboard routers: templates, page rendering, datetimes."""
 
+import time
 from datetime import date, datetime, timezone
 
 from fastapi import Request
@@ -12,6 +13,8 @@ from utils.timeutil import local_now, posting_tz  # noqa: F401  (re-exported)
 templates = Jinja2Templates(directory="dashboard/templates")
 
 templates.env.globals["posting_timezone"] = settings.POSTING_TIMEZONE
+# Changes on every restart, so browsers load fresh CSS/JS after an update instead of a cached copy.
+templates.env.globals["asset_version"] = str(int(time.time()))
 
 
 def to_iso(value) -> str | None:
