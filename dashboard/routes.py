@@ -233,7 +233,7 @@ def api_approve(post_id: int, body: ApproveRequest, db: Session = Depends(get_db
         except ValueError:
             return JSONResponse({"error": "Invalid datetime format"}, status_code=400)
         if scheduled_time <= datetime.utcnow():
-            return JSONResponse({"error": "Pick a time in the future"}, status_code=400)
+            return JSONResponse({"error": "That time has already passed. Pick a later date or time."}, status_code=400)
 
     post = pq.approve(post_id, edited_content=body.edited_content, scheduled_time=scheduled_time)
     if not post:
@@ -492,7 +492,7 @@ def api_schedule_post(post_id: int, body: ScheduleRequest, db: Session = Depends
     except ValueError:
         return JSONResponse({"error": "Invalid datetime format"}, status_code=400)
     if scheduled_time <= datetime.utcnow():
-        return JSONResponse({"error": "Pick a time in the future"}, status_code=400)
+        return JSONResponse({"error": "That time has already passed. Pick a later date or time."}, status_code=400)
 
     pq = PostQueue(db)
     post = pq.schedule(post_id, scheduled_time)

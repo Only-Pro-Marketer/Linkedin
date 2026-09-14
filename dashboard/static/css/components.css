@@ -6,7 +6,7 @@
 
 /* ── Page header ─────────────────────────────────────────────── */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 24px; }
-.page-head h1 { font-size: 28px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; }
+.page-head h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.025em; line-height: 1.15; }
 .page-head p { font-size: 14px; color: var(--text-secondary); margin-top: 6px; }
 .page-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 
@@ -38,7 +38,7 @@ textarea.field-input { resize: vertical; }
 .metric { padding: 18px 20px; display: block; text-decoration: none; color: inherit; transition: box-shadow var(--duration-fast) var(--ease-out), transform var(--duration-fast) var(--ease-out); }
 a.metric:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
 .metric-label { font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--text-muted); }
-.metric-value { font-size: 28px; font-weight: 700; letter-spacing: -.02em; margin-top: 6px; line-height: 1; }
+.metric-value { font-size: 26px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; margin-top: 6px; line-height: 1; }
 .metric-sub { font-size: 12px; color: var(--text-secondary); margin-top: 6px; }
 
 .muted { color: var(--text-secondary); }

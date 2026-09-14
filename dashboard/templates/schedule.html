@@ -2,6 +2,12 @@
 {% block page_title %}Schedule{% endblock %}
 
 {% block content %}
+<div class="page-head">
+    <div>
+        <h1>Schedule</h1>
+        <p>Scheduled posts and your open posting times, in {{ posting_timezone }}.</p>
+    </div>
+</div>
 
 <!-- Stat cards -->
 <div class="grid grid-cols-3 gap-5 mb-8">
@@ -43,7 +49,7 @@
 <!-- Header -->
 <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
     <div class="flex items-center gap-3">
-        <h2 class="section-heading" style="font-size:22px">Posting Schedule</h2>
+        <h2 class="section-title">Posting schedule</h2>
         <div class="flex items-center bg-white border border-gray-200 rounded-lg p-0.5">
             <button onclick="prevWeek()" class="px-3 py-1.5 text-xs rounded-md font-medium text-gray-500 hover:bg-gray-50 transition-all">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
@@ -106,12 +112,9 @@
             </div>
 
             <!-- Quick time buttons -->
-            <div class="flex items-center gap-2 mb-5">
+            <div class="flex items-center gap-2 mb-5 flex-wrap">
                 <span class="text-xs text-gray-400">Quick:</span>
-                <button onclick="setQuickTime('10:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">10 AM</button>
-                <button onclick="setQuickTime('12:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">12 PM</button>
-                <button onclick="setQuickTime('16:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">4 PM</button>
-                <button onclick="setQuickTime('22:00')" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">10 PM</button>
+                <span id="quick-times" class="flex items-center gap-2 flex-wrap"></span>
             </div>
 
             <!-- Actions -->
@@ -128,16 +131,24 @@
 
 <script>
 let scheduleData = { scheduled: [], available: [] };
-let currentWeekStart = getMondayOfWeek(new Date());
+let postingTimes = {};  // weekday (0 = Monday) -> ['09:00', ...] from Settings -> Posting times
+let currentWeekStart = startOfToday();  // the view starts today, so it never opens on a week that's mostly over
 let reschedulePostId = null;
-const DEFAULT_SLOTS = ['10:00', '12:00', '16:00', '22:00'];
+const DEFAULT_SLOTS = ['10:00', '12:00', '16:00', '22:00'];  // only used when no posting times are set
 
 document.addEventListener('DOMContentLoaded', loadSchedule);
 
 async function loadSchedule() {
     try {
-        const res = await fetch('/api/schedule');
+        const [res, cal] = await Promise.all([fetch('/api/schedule'), fetch('/api/calendar')]);
         scheduleData = await res.json();
+        postingTimes = {};
+        if (cal.ok) {
+            ((await cal.json()).slots || []).filter(s => s.is_active).forEach(s => {
+                (postingTimes[s.day_of_week] = postingTimes[s.day_of_week] || []).push(s.time_slot);
+            });
+        }
+        renderQuickTimes();
         updateStats();
         renderTimeline();
     } catch (e) {
@@ -176,8 +187,8 @@ function updateStats() {
 
 function renderTimeline() {
     const container = document.getElementById('schedule-container');
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = startOfToday();
+    const now = new Date();
 
     // Build lookup: date string -> array of scheduled posts
     const byDate = {};
@@ -226,7 +237,7 @@ function renderTimeline() {
         }));
 
         // Collect all slots: defaults + actual post times
-        const allSlots = new Set([...DEFAULT_SLOTS]);
+        const allSlots = new Set(slotsForDay(day));
         dayPosts.forEach(p => {
             const h = String(p._dt.getHours()).padStart(2, '0');
             const m = String(p._dt.getMinutes()).padStart(2, '0');
@@ -246,7 +257,7 @@ function renderTimeline() {
                     const viralityBadge = p.virality_score
                         ? `<span class="badge ${p.virality_score >= 70 ? 'bg-amber-50 text-amber-700' : p.virality_score >= 40 ? 'bg-blue-50 text-blue-600' : 'bg-gray-50 text-gray-500'} text-[11px]">${p.virality_score}/100</span>`
                         : '';
-                    html += `<div class="flex items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+                    html += `<div class="flex flex-wrap items-center gap-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
                         <span class="text-sm font-mono font-medium text-blue-600 w-20 shrink-0">${formatTimeSlot(slot)}</span>
                         <div class="flex-1 min-w-0">
                             <p class="text-sm text-gray-700 truncate">${esc(p.content)}</p>
@@ -258,13 +269,19 @@ function renderTimeline() {
                                 ${p.has_image ? '<span class="badge bg-purple-50 text-purple-600 text-[11px]">img</span>' : ''}
                             </div>
                         </div>
-                        <div class="flex items-center gap-1.5 shrink-0">
+                        <div class="flex items-center gap-1.5 shrink-0 w-full sm:w-auto justify-end">
                             <button onclick="openRescheduleModal(${p.id})" class="btn btn-ghost btn-sm text-xs">Reschedule</button>
                             <button onclick="unschedulePost(${p.id})" class="btn btn-ghost btn-sm text-xs text-red-500 hover:bg-red-50">Unschedule</button>
                             <button onclick="postNow(${p.id}, this)" class="btn btn-primary btn-sm text-xs">Post Now</button>
                         </div>
                     </div>`;
                 });
+            } else if (slotDate(day, slot) <= now) {
+                // Already passed: you can't schedule into the past
+                html += `<div class="flex items-center gap-3 p-3 rounded-lg border border-dashed border-gray-100">
+                    <span class="text-sm font-mono text-gray-300 w-20 shrink-0">${formatTimeSlot(slot)}</span>
+                    <div class="flex-1"><span class="text-sm text-gray-300">Passed</span></div>
+                </div>`;
             } else {
                 // Empty slot
                 const dateStr = toInputDate(day);
@@ -278,6 +295,14 @@ function renderTimeline() {
                 </div>`;
             }
         });
+
+        if (sortedSlots.length === 0) {
+            html += isPast
+                ? '<p class="text-sm text-gray-300">No posting time on this day</p>'
+                : `<p class="text-sm text-gray-400">No posting time on this day.
+                    <button type="button" data-date="${esc(toInputDate(day))}" onclick="openScheduleModal(this.dataset.date)"
+                        class="text-blue-500 font-medium hover:text-blue-700">Pick a time</button></p>`;
+        }
 
         html += '</div></div>';
     }
@@ -303,15 +328,11 @@ function openScheduleModal(preDate, preTime) {
         select.innerHTML += `<option value="${p.id}">${esc(label)}</option>`;
     });
 
-    // Set date/time
-    if (preDate) {
-        document.getElementById('schedule-date').value = preDate;
-    } else {
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById('schedule-date').value = toInputDate(tomorrow);
-    }
-    document.getElementById('schedule-time').value = preTime || '10:00';
+    // Set date/time: the slot you clicked, otherwise your next free posting time
+    const next = preDate ? null : nextFreeSlot();
+    document.getElementById('schedule-date').min = toInputDate(new Date());
+    document.getElementById('schedule-date').value = preDate || next.date;
+    document.getElementById('schedule-time').value = preTime || (next ? next.time : defaultTimeFor(preDate));
 
     document.getElementById('schedule-post-preview').classList.add('hidden');
     document.getElementById('schedule-modal').classList.remove('hidden');
@@ -333,7 +354,8 @@ function openRescheduleModal(postId) {
     preview.textContent = post.full_content || post.content;
     preview.classList.remove('hidden');
 
-    // Set current date/time
+    // Set current date/time (past dates can't be picked)
+    document.getElementById('schedule-date').min = toInputDate(new Date());
     const dt = new Date(post.scheduled_time);
     document.getElementById('schedule-date').value = toInputDate(dt);
     document.getElementById('schedule-time').value = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
@@ -372,6 +394,10 @@ async function submitSchedule() {
 
     if (!postId) { showToast('Select a post', 'error'); return; }
     if (!date || !time) { showToast('Select date and time', 'error'); return; }
+    if (new Date(`${date}T${time}`) <= new Date()) {
+        showToast('That time has already passed. Pick a later date or time.', 'error');
+        return;
+    }
 
     const scheduledTime = `${date}T${time}:00`;
 
@@ -450,19 +476,58 @@ function nextWeek() {
 }
 
 function goToToday() {
-    currentWeekStart = getMondayOfWeek(new Date());
+    currentWeekStart = startOfToday();
     renderTimeline();
 }
 
 /* ── Helpers ─────────────────────────────────────────────── */
 
-function getMondayOfWeek(date) {
-    const d = new Date(date);
+function startOfToday() {
+    const d = new Date();
     d.setHours(0, 0, 0, 0);
-    const day = d.getDay();
-    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-    d.setDate(diff);
     return d;
+}
+
+function slotDate(day, slot) {
+    const [h, m] = slot.split(':').map(Number);
+    const d = new Date(day);
+    d.setHours(h, m, 0, 0);
+    return d;
+}
+
+function slotsForDay(day) {
+    // Your posting times from Settings; the old fixed times only if none are set
+    if (!Object.keys(postingTimes).length) return DEFAULT_SLOTS;
+    return postingTimes[(day.getDay() + 6) % 7] || [];
+}
+
+function nextFreeSlot() {
+    const now = new Date();
+    const taken = new Set(scheduleData.scheduled.filter(p => p.scheduled_time).map(p => new Date(p.scheduled_time).getTime()));
+    for (let i = 0; i < 14; i++) {
+        const day = startOfToday();
+        day.setDate(day.getDate() + i);
+        for (const slot of [...slotsForDay(day)].sort()) {
+            const dt = slotDate(day, slot);
+            if (dt > now && !taken.has(dt.getTime())) return { date: toInputDate(day), time: slot };
+        }
+    }
+    const tomorrow = startOfToday();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return { date: toInputDate(tomorrow), time: '10:00' };
+}
+
+function defaultTimeFor(dateStr) {
+    // Today: the next full hour; any other day: 10:00
+    if (dateStr !== toInputDate(new Date())) return '10:00';
+    return `${String(Math.min(new Date().getHours() + 1, 23)).padStart(2, '0')}:00`;
+}
+
+function renderQuickTimes() {
+    const times = [...new Set(Object.values(postingTimes).flat())].sort();
+    document.getElementById('quick-times').innerHTML = (times.length ? times : DEFAULT_SLOTS).map(t =>
+        `<button type="button" data-time="${esc(t)}" onclick="setQuickTime(this.dataset.time)" class="px-2.5 py-1 text-xs rounded-md border border-gray-200 text-gray-600 hover:bg-blue-50 hover:text-blue-600 hover:border-blue-200 transition-all">${formatTimeSlot(t)}</button>`
+    ).join('');
 }
 
 function toDateKey(date) {

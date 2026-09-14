@@ -2,6 +2,13 @@
 {% block page_title %}Competitors{% endblock %}
 
 {% block content %}
+<div class="page-head">
+    <div>
+        <h1>Competitors</h1>
+        <p>People in your space: what they post, and which hooks and formats work for them.</p>
+    </div>
+</div>
+
 <!-- Insights Bar -->
 <div id="insights-bar" class="grid grid-cols-2 md:grid-cols-4 gap-5 mb-8">
     <div class="glass-card stat-card p-6 fade-in-up stagger-1">
@@ -10,7 +17,7 @@
                 <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
             </div>
             <div>
-                <p class="stat-value" style="font-size:28px" id="stat-total-competitors">--</p>
+                <p class="stat-value" id="stat-total-competitors">--</p>
                 <p class="stat-label">Competitors</p>
             </div>
         </div>
@@ -21,7 +28,7 @@
                 <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
             </div>
             <div>
-                <p class="stat-value" style="font-size:28px" id="stat-total-posts">--</p>
+                <p class="stat-value" id="stat-total-posts">--</p>
                 <p class="stat-label">Posts Tracked</p>
             </div>
         </div>
@@ -53,7 +60,7 @@
 <!-- Header -->
 <div class="flex items-center justify-between mb-6">
     <div>
-        <h2 class="section-heading" style="font-size:22px">Competitor Tracking</h2>
+        <h2 class="section-title">Tracked people</h2>
         <p class="text-sm text-gray-400 mt-0.5">Monitor and learn from top performers in your niche</p>
     </div>
     <div class="flex gap-2">

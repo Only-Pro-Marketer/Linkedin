@@ -34,7 +34,7 @@
     --danger-bg: #fef2f2;
 
     /* Borders */
-    --border-primary: rgba(0, 0, 0, 0.06);
+    --border-primary: rgba(0, 0, 0, 0.08);
     --border-subtle: rgba(0, 0, 0, 0.04);
     --border-sidebar: rgba(255, 255, 255, 0.08);
 
@@ -49,6 +49,9 @@
     --sidebar-width: 240px;
     --sidebar-collapsed: 64px;
     --header-height: 56px;
+    --content-max: 1560px;                      /* fills large monitors without over-long lines */
+    --page-pad-x: clamp(16px, 3vw, 44px);       /* page side padding: 16px on phones, 44px on desktops */
+    --page-pad-y: clamp(20px, 2.4vw, 32px);
     --radius-sm: 8px;
     --radius-md: 12px;
     --radius-lg: 16px;
@@ -66,10 +69,20 @@
 /* ── Base ───────────────────────────────────────────────────────── */
 body {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    font-feature-settings: 'cv11', 'ss01';  /* Inter's cleaner single-storey a and open digits */
     background: var(--surface-page);
     color: var(--text-primary);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+}
+
+::selection { background: #cfe3fb; }
+
+/* Keyboard focus is always visible; mouse clicks don't draw a ring */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
 }
 
 /* ── Layout Shell ───────────────────────────────────────────────── */
@@ -80,6 +93,7 @@ body {
 
 .app-content {
     flex: 1;
+    min-width: 0;  /* a wide row wraps or scrolls inside the page instead of stretching it past the screen */
     margin-left: var(--sidebar-width);
     transition: margin-left var(--duration-normal) var(--ease-out);
     min-height: 100vh;
@@ -90,9 +104,9 @@ body {
 }
 
 .content-wrapper {
-    max-width: 1200px;
+    max-width: var(--content-max);
     margin: 0 auto;
-    padding: 32px 40px;
+    padding: var(--page-pad-y) var(--page-pad-x) 48px;
 }
 
 /* ── Sidebar ────────────────────────────────────────────────────── */
@@ -305,7 +319,8 @@ body {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 40px;
+    /* Line the title up with the page content, which is centred once the screen is wider than --content-max */
+    padding: 0 max(var(--page-pad-x), calc((100% - var(--content-max)) / 2 + var(--page-pad-x)));
     border-bottom: 1px solid var(--border-primary);
     background: var(--surface-glass);
     backdrop-filter: blur(20px);
@@ -322,23 +337,19 @@ body {
 }
 
 /* ── Glass Cards ────────────────────────────────────────────────── */
+/* Solid cards with a hairline border, the same look as .card on the newer pages.
+   (They used to be translucent "glass" with a hover lift: slow to paint on long pages and jumpy in lists.) */
 .glass-card {
-    background: var(--surface-glass);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid var(--border-subtle);
+    background: var(--surface-primary);
+    border: 1px solid var(--border-primary);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xs);
-    transition: all var(--duration-normal) var(--ease-out);
-}
-
-.glass-card:hover {
-    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--duration-fast) var(--ease-out), border-color var(--duration-fast) var(--ease-out);
 }
 
 .glass-card-interactive:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    border-color: rgba(0, 0, 0, 0.14);
+    box-shadow: var(--shadow-sm);
 }
 
 /* Solid white card variant */
@@ -350,14 +361,10 @@ body {
 }
 
 /* ── Stat Cards ─────────────────────────────────────────────────── */
-.stat-card {
-    padding: 24px;
-    transition: all var(--duration-normal) var(--ease-out);
-}
-
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+/* Compact number cards, matching .metric on Home. Two classes so this beats Tailwind's p-6. */
+.stat-card,
+.glass-card.stat-card {
+    padding: 16px 18px;
 }
 
 .stat-label {
@@ -369,8 +376,9 @@ body {
 }
 
 .stat-value {
-    font-size: 32px;
+    font-size: 26px;
     font-weight: 700;
+    font-variant-numeric: tabular-nums;
     color: var(--text-primary);
     letter-spacing: -0.02em;
     margin-top: 6px;
@@ -387,6 +395,7 @@ body {
 .btn {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     font-weight: 500;
     border-radius: var(--radius-md);
@@ -450,20 +459,25 @@ body {
     color: var(--text-primary);
 }
 
+/* Minimum heights keep buttons in a row aligned whatever their icon or text: 32 / 38 / 44 px */
 .btn-sm {
-    padding: 7px 14px;
+    min-height: 32px;
+    padding: 6px 12px;
     font-size: 13px;
     border-radius: var(--radius-sm);
 }
 
 .btn-md {
-    padding: 9px 18px;
-    font-size: 14px;
+    min-height: 38px;
+    padding: 8px 16px;
+    font-size: 13.5px;
+    border-radius: 10px;
 }
 
 .btn-lg {
-    padding: 12px 24px;
-    font-size: 15px;
+    min-height: 44px;
+    padding: 10px 20px;
+    font-size: 14.5px;
     border-radius: var(--radius-md);
 }
 
@@ -506,9 +520,10 @@ body {
 /* ── Form Inputs ────────────────────────────────────────────────── */
 .input {
     width: 100%;
-    padding: 10px 14px;
-    border: 1px solid var(--border-primary);
-    border-radius: var(--radius-md);
+    min-height: 38px;
+    padding: 8px 12px;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 10px;
     font-size: 14px;
     font-family: inherit;
     color: var(--text-primary);
@@ -527,9 +542,10 @@ body {
 }
 
 .input-lg {
-    padding: 14px 18px;
-    font-size: 15px;
-    border-radius: var(--radius-lg);
+    min-height: 44px;
+    padding: 10px 16px;
+    font-size: 14.5px;
+    border-radius: var(--radius-md);
 }
 
 /* ── Toast Notifications ────────────────────────────────────────── */
@@ -717,11 +733,26 @@ body {
 
 /* ── Utilities ──────────────────────────────────────────────────── */
 .section-heading {
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 700;
     letter-spacing: -0.025em;
     color: var(--text-primary);
     line-height: 1.2;
+}
+
+/* A heading inside a card is a card title, not a page title (several pages set 22px inline) */
+.glass-card .section-heading,
+.card .section-heading {
+    font-size: 16px !important;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.section-title {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.015em;
+    color: var(--text-primary);
 }
 
 .section-subheading {
@@ -807,11 +838,39 @@ body {
     }
 
     .stat-value {
-        font-size: 24px;
+        font-size: 22px;
     }
 
     .section-heading {
         font-size: 22px;
+    }
+
+    /* Older pages: header rows wrap instead of pushing the page sideways */
+    .content-wrapper .flex.items-center.justify-between {
+        flex-wrap: wrap;
+        row-gap: 12px;
+    }
+
+    /* ...but a stat card keeps its number and icon side by side */
+    .content-wrapper .stat-card .flex.items-center.justify-between {
+        flex-wrap: nowrap;
+    }
+
+    .toast {
+        left: 16px;
+        right: 16px;
+        bottom: 16px;
+    }
+}
+
+@media (max-width: 640px) {
+    /* Fixed 3-7 column stat rows become two columns on phones */
+    .content-wrapper .grid.grid-cols-3,
+    .content-wrapper .grid.grid-cols-4,
+    .content-wrapper .grid.grid-cols-5,
+    .content-wrapper .grid.grid-cols-6,
+    .content-wrapper .grid.grid-cols-7 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 

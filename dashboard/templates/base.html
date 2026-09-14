@@ -89,10 +89,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <link rel="stylesheet" href="/static/css/components.css">
-    <script src="/static/js/app.js"></script>
-    <script src="/static/js/post-editor.js"></script>
+    <link rel="stylesheet" href="/static/css/styles.css?v={{ asset_version }}">
+    <link rel="stylesheet" href="/static/css/components.css?v={{ asset_version }}">
+    <script src="/static/js/app.js?v={{ asset_version }}"></script>
+    <script src="/static/js/post-editor.js?v={{ asset_version }}"></script>
     {% block head %}{% endblock %}
 </head>
 <body class="h-full">
@@ -241,7 +241,14 @@
                     <span class="page-title">{% block page_title %}Dashboard{% endblock %}</span>
                 </div>
                 <div class="flex items-center gap-3">
-                    {% block header_actions %}{% endblock %}
+                    {% block header_actions %}
+                    {% if page not in ('home', 'studio') %}
+                    <a href="/studio" class="btn btn-primary btn-sm">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                        Write a post
+                    </a>
+                    {% endif %}
+                    {% endblock %}
                 </div>
             </header>
 
@@ -255,6 +262,6 @@
     <!-- Toast notification -->
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-    <script src="/static/js/dashboard.js" defer></script>
+    <script src="/static/js/dashboard.js?v={{ asset_version }}" defer></script>
 </body>
 </html>

@@ -3,6 +3,13 @@
 {% block page_title %}Queue{% endblock %}
 
 {% block content %}
+<div class="page-head">
+    <div>
+        <h1>Queue</h1>
+        <p>Review every draft here. Nothing is published until you approve it.</p>
+    </div>
+</div>
+
 <!-- Stats -->
 <div class="grid grid-cols-2 sm:grid-cols-4 gap-5 mb-8">
     <div class="glass-card stat-card fade-in-up stagger-1">
@@ -25,15 +32,15 @@
 
 <!-- Topic generator + Recreate -->
 <div class="glass-card p-6 mb-6 fade-in-up stagger-5">
-    <div class="flex items-center gap-3">
-        <div class="flex-1">
+    <div class="flex flex-wrap items-center gap-3">
+        <div class="flex-1 min-w-[220px]">
             <input type="text" id="topic-input" class="input input-lg" placeholder="Type a topic... e.g. 'Klaviyo email flows for supplements'" onkeydown="if(event.key==='Enter')generateFromTopic()">
         </div>
         <button onclick="generateFromTopic()" id="topic-gen-btn" class="btn btn-primary btn-lg whitespace-nowrap">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
             Generate
         </button>
-        <div class="w-px h-10 bg-gray-200/60"></div>
+        <div class="hidden sm:block w-px h-10 bg-gray-200/60"></div>
         <input type="number" id="recreate-id-input" class="input text-center" style="width:90px;" placeholder="Post #" onkeydown="if(event.key==='Enter')recreateById()">
         <button onclick="recreateById()" id="recreate-btn" class="btn btn-ghost btn-md whitespace-nowrap">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
@@ -44,8 +51,8 @@
 
 <!-- Action bar -->
 <div class="flex items-center justify-between mb-6 fade-in-up stagger-6">
-    <h2 class="section-heading" style="font-size:22px;">Post Queue</h2>
-    <div class="flex gap-2">
+    <h2 class="section-title">Drafts</h2>
+    <div class="flex flex-wrap gap-2">
         <button onclick="bulkApprove()" class="btn btn-primary btn-sm">
             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
             Approve Selected
@@ -213,12 +220,12 @@ async function loadQueue() {
         }
 
         container.innerHTML = postsData.map((post, i) => `
-            <div class="glass-card p-6 fade-in-up" id="post-${post.id}" style="animation-delay: ${i * 60}ms">
+            <div class="glass-card p-4 sm:p-6 fade-in-up" id="post-${post.id}" style="animation-delay: ${i * 60}ms">
                 <div class="flex items-start justify-between mb-4">
                     <div class="flex items-center gap-2 flex-wrap">
                         <input type="checkbox" class="post-checkbox w-4 h-4 rounded border-gray-300 text-gray-900 focus:ring-gray-400" value="${post.id}">
                         <span class="badge badge-info">${escapeHtml(post.template_name || 'Unknown')}</span>
-                        ${post.hook_type ? `<span class="badge badge-neutral">${escapeHtml(post.hook_type)}</span>` : ''}
+                        ${post.hook_type && post.hook_type !== 'unknown' ? `<span class="badge badge-neutral">${escapeHtml(post.hook_type)}</span>` : ''}
                         ${App.qualityBadge(post.quality_report, post.quality_score)}
                         ${mediaTypeBadge(post)}
                         ${factCheckBadge(post)}
@@ -226,10 +233,10 @@ async function loadQueue() {
                         <span class="text-xs" style="color: var(--text-muted);">${post.word_count ?? post.content.split(/\s+/).filter(Boolean).length}w · ${post.char_count || post.content.length}c · ${post.newline_count ?? (post.content.match(/\n/g) || []).length} lines</span>
                         ${(post.newline_count || 0) > 25 ? '<span class="badge badge-danger">Too many lines!</span>' : (post.newline_count || 0) > 22 ? '<span class="badge badge-warning">High line count</span>' : ''}
                     </div>
-                    ${post.topic ? `<span class="badge badge-neutral">${escapeHtml(post.topic)}</span>` : ''}
+                    ${post.topic ? `<span class="badge badge-neutral min-w-0 max-w-[45%]" title="${escapeHtml(post.topic)}"><span class="truncate min-w-0">${escapeHtml(post.topic)}</span></span>` : ''}
                 </div>
-                <div class="flex gap-5">
-                    <div class="flex-1">
+                <div class="flex flex-col sm:flex-row gap-5">
+                    <div class="flex-1 min-w-0">
                         <div class="post-content text-[13.5px] mb-5 leading-relaxed max-h-48 overflow-y-auto pr-2" style="color: var(--text-secondary);">${escapeHtml(post.content)}</div>
                     </div>
                     ${post.has_video && post.video_path ? `
@@ -247,7 +254,7 @@ async function loadQueue() {
                         </button>
                     </div>` : ''}
                 </div>
-                <div class="flex items-center gap-2 pt-4" style="border-top: 1px solid var(--border-subtle);">
+                <div class="flex flex-wrap items-center gap-2 pt-4" style="border-top: 1px solid var(--border-subtle);">
                     <button onclick="approvePost(${post.id})" class="btn btn-primary btn-sm">
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                         Approve
