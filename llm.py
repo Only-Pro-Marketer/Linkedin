@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from typing import Sequence, TypeVar
 
 import anthropic
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from config import settings
 
@@ -29,6 +29,16 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 FALLBACK_BETA = "server-side-fallback-2026-07-01"
+
+# Only these accept output_config.effort. Haiku 4.5 and older models answer
+# "This model does not support the effort parameter" with a 400, which would break
+# every structured call if someone points CLAUDE_MODEL at one.
+EFFORT_MODELS = ("claude-opus-5", "claude-sonnet-5", "claude-fable-5", "claude-opus-4-8",
+                 "claude-opus-4-7", "claude-opus-4-6", "claude-sonnet-4-6")
+
+
+def supports_effort(model: str) -> bool:
+    return any(model.startswith(prefix) for prefix in EFFORT_MODELS)
 
 # USD per million tokens: (input, output). Cache reads bill 0.1x input, writes 1.25x.
 PRICES = {
@@ -106,7 +116,7 @@ def _request(user: str, *, packs, brand, instructions, max_tokens, effort) -> di
         "system": system_blocks(packs, brand=brand, instructions=instructions),
         "messages": [{"role": "user", "content": user}],
     }
-    if effort:
+    if effort and supports_effort(kwargs["model"]):
         kwargs["output_config"] = {"effort": effort}
     if settings.CLAUDE_REFUSAL_FALLBACKS:
         kwargs["betas"] = [FALLBACK_BETA]
@@ -222,7 +232,17 @@ def complete_json(
     kwargs = _request(user, packs=packs, brand=brand, instructions=instructions,
                       max_tokens=max_tokens, effort=effort)
     kwargs["output_format"] = schema
-    resp = _call(feature, lambda: get_client().beta.messages.parse(**kwargs))
+    try:
+        resp = _call(feature, lambda: get_client().beta.messages.parse(**kwargs))
+    except ValidationError as e:
+        # The SDK validates while reading the response, so a cut-off answer arrives
+        # here as an unreadable JSON parse error rather than a usable message.
+        logger.warning("Unusable structured answer for %s: %s", feature, str(e)[:200])
+        raise LLMError("Claude's answer was cut off or not in the expected format. Try again.") from e
+    if getattr(resp, "stop_reason", None) == "max_tokens":
+        # Without this the half-written JSON surfaces as an unreadable parse error.
+        logger.warning("Claude hit max_tokens for %s; the structured answer was cut off", feature)
+        raise LLMError("Claude's answer was cut off before it finished. Try again.")
     parsed = getattr(resp, "parsed_output", None)
     if parsed is None:
         raise LLMError("Claude returned an answer in an unexpected format. Try again.")

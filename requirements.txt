@@ -39,8 +39,5 @@ Pillow>=12.3.0  # older versions have known CVEs; moviepy 2.2.1 declares <12 but
 imageio>=2.34.0
 imageio-ffmpeg>=0.5.1
 
-# Screen Recording
-playwright>=1.40.0
-
 # Utilities
 rich>=13.0.0

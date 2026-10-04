@@ -12,6 +12,8 @@ class TokenManager:
 
     def __init__(self, db: Session):
         self.db = db
+        self._token: OAuthToken | None = None
+        self._token_loaded = False
 
     def store_token(
         self,
@@ -44,11 +46,20 @@ class TokenManager:
         self.db.add(token)
         self.db.commit()
         self.db.refresh(token)
+        self._token, self._token_loaded = token, True
         return token
 
     def get_current_token(self) -> OAuthToken | None:
-        """Get the most recent stored token."""
-        return self.db.query(OAuthToken).order_by(OAuthToken.id.desc()).first()
+        """The most recent stored token, read once per TokenManager.
+
+        Rendering a page asks for it several times (status, is_authenticated,
+        needs_refresh); a TokenManager lives for one request, so one query is enough.
+        Writes below reset the cache.
+        """
+        if not self._token_loaded:
+            self._token = self.db.query(OAuthToken).order_by(OAuthToken.id.desc()).first()
+            self._token_loaded = True
+        return self._token
 
     def get_valid_access_token(self) -> str | None:
         """Return a valid access token, or None if expired/missing."""

@@ -230,3 +230,29 @@ def test_migrations_are_idempotent(app):
 def test_tone_regex_stops_at_line_end(db):
     from analytics.pattern_analyzer import PatternAnalyzer
     assert PatternAnalyzer(db)._extract_tone("TONE: authoritative\nANGLE: story") == "authoritative"
+
+
+def test_token_is_read_once_per_request(db):
+    """Rendering a page asks for the token several times; one query is enough."""
+    from auth.token_manager import TokenManager
+    from tests.conftest import connect_linkedin
+
+    connect_linkedin(db)
+    tm = TokenManager(db)
+    calls = []
+    real = db.query
+
+    def counting_query(model, *a, **k):
+        from database.models import OAuthToken
+        if model is OAuthToken:
+            calls.append(1)
+        return real(model, *a, **k)
+
+    db.query = counting_query
+    try:
+        status = tm.get_token_status()          # status + is_authenticated + needs_refresh
+        assert status["authenticated"] is True
+        assert tm.get_person_urn()
+        assert len(calls) == 1, f"{len(calls)} token queries, expected 1"
+    finally:
+        db.query = real

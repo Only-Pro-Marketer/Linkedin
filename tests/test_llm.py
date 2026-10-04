@@ -183,3 +183,25 @@ def test_comment_and_reply_urls():
 def test_non_linkedin_urls_are_rejected():
     from linkedin.url_parser import parse_linkedin_url
     assert parse_linkedin_url(f"https://evil.example/posts/x-activity-{ACT}")["url_type"] == "unknown"
+
+
+def test_effort_is_only_sent_to_models_that_accept_it(monkeypatch):
+    """Haiku 4.5 answers 400 "This model does not support the effort parameter"."""
+    kw = dict(packs=(), brand=False, instructions="", max_tokens=100, effort="low")
+    monkeypatch.setattr(settings, "CLAUDE_MODEL", "claude-opus-5")
+    assert llm._request("hi", **kw)["output_config"] == {"effort": "low"}
+    monkeypatch.setattr(settings, "CLAUDE_MODEL", "claude-haiku-4-5-20251001")
+    assert "output_config" not in llm._request("hi", **kw)
+    assert llm.supports_effort("claude-sonnet-5") and not llm.supports_effort("claude-haiku-4-5")
+
+
+def test_a_cut_off_structured_answer_says_so(api):
+    """A truncated answer used to surface as an unreadable JSON parse error."""
+    from pydantic import BaseModel
+
+    class Score(BaseModel):
+        score: int
+
+    api(body=_message(text='{"score": 7', stop_reason="max_tokens"))
+    with pytest.raises(llm.LLMError, match="cut off"):
+        llm.complete_json("unit_cutoff", "rate it", Score, brand=False)
