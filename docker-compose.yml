@@ -1,0 +1,28 @@
+services:
+  app:
+    build: .
+    image: linkedin-content-engine
+    container_name: content-engine
+    # Published to this machine only. Change to "8000:8000" only if you also set
+    # DASHBOARD_PASSWORD in .env — otherwise the dashboard has no login.
+    ports:
+      - "127.0.0.1:8000:8000"
+    env_file:
+      - .env
+    environment:
+      # Keeps the host allowlist at localhost; uvicorn still listens on 0.0.0.0
+      # inside the container (see the Dockerfile).
+      HOST: 127.0.0.1
+      PORT: "8000"
+      # The app directory is not writable in the container; the log goes to ./logs
+      LOG_FILE: /app/logs/posting.log
+    # Same user id as your account, so files written into ./database and ./soul
+    # stay readable and writable outside Docker.
+    user: "${UID:-501}:${GID:-20}"
+    volumes:
+      - ./database:/app/database
+      - ./logs:/app/logs
+      - ./soul:/app/soul
+      - ./dashboard/static/images:/app/dashboard/static/images
+      - ./dashboard/static/videos:/app/dashboard/static/videos
+    restart: unless-stopped

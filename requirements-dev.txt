@@ -1,4 +1,8 @@
 -r requirements.txt
+# Only the optional screen-record and deep-research features need a browser.
+# Keeping it out of requirements.txt keeps ~134 MB out of the Docker image.
+# After installing: playwright install chromium
+playwright>=1.40.0
 pytest>=8.0
 pytest-asyncio>=0.23
 time-machine>=2.14

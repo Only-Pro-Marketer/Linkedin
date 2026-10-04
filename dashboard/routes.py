@@ -646,7 +646,8 @@ def api_generate_image(post_id: int, db: Session = Depends(get_db)):
     result = gen.generate_for_post(db, post_id)
     if result.get("success"):
         return {"status": "generated", "id": post_id, "image_path": result.get("image_path", ""),
-                "provider": result.get("provider"), "credits": result.get("credits")}
+                "provider": result.get("provider"), "model": result.get("model"),
+                "credits": result.get("credits")}
     status = 404 if result.get("error") == "Post not found" else 502
     return JSONResponse({"error": result.get("error", "Image generation failed")}, status_code=status)
 

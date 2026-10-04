@@ -18,16 +18,19 @@ def kie(monkeypatch, tmp_path):
 
     monkeypatch.setattr(settings, "KIE_API_KEY", "test-kie")
     monkeypatch.setattr(ig, "IMAGES_DIR", tmp_path)
-    state = {"states": ["generating", "success"], "create_code": 200, "fail": False}
+    state = {"states": ["generating", "success"], "create_code": 200, "fail": False,
+             "fail_models": set(), "models": []}
 
     def handler(request: httpx.Request):
         if request.url.path.endswith("/createTask"):
             state["body"] = json.loads(request.content)
+            state["models"].append(state["body"]["model"])
             code = state["create_code"]
             return httpx.Response(200, json={"code": code, "msg": "success" if code == 200 else "insufficient credits",
                                              "data": {"taskId": "task_1"}})
         if request.url.path.endswith("/recordInfo"):
-            s = "fail" if state["fail"] else (state["states"].pop(0) if state["states"] else "success")
+            down = state["models"] and state["models"][-1] in state["fail_models"]
+            s = "fail" if (state["fail"] or down) else (state["states"].pop(0) if state["states"] else "success")
             data = {"taskId": "task_1", "state": s, "failMsg": "content policy" if s == "fail" else "",
                     "creditsConsumed": 4}
             if s == "success":
@@ -85,3 +88,48 @@ def test_no_image_key_and_removal_still_works(client, db, monkeypatch):
     assert client.delete(f"/api/queue/{post.id}/image").status_code == 200
     db.refresh(post)
     assert not post.has_image and post.image_path is None
+
+
+def test_auto_picks_a_model_that_fits_the_post():
+    """KIE_IMAGE_MODEL=auto: illustration, detail/photoreal and everyday posts get different models."""
+    from content.image_generator import KIE_MODELS, choose_model
+
+    assert choose_model("A flat vector illustration of a founder at 5am") == "poster"
+    assert choose_model("Our new supplement packaging landed on the shelf", "retail") == "detail"
+    assert choose_model("A checklist of the 5 steps we use before launch") == "detail"
+    assert choose_model("We spent $2,000 on influencers and made back $600") == "fast"
+    assert KIE_MODELS["fast"]["id"] == "google/nano-banana"
+
+
+def test_each_model_sends_only_the_fields_it_accepts(monkeypatch):
+    """The models don't share an input format: Seedream takes a size name and has no 4:5."""
+    from content.image_generator import resolve_model
+
+    monkeypatch.setattr(settings, "KIE_IMAGE_ASPECT", "4:5")
+    monkeypatch.setattr(settings, "KIE_IMAGE_MODEL", "auto")
+    model_id, build = resolve_model("a flat vector illustration", "")
+    assert model_id == "bytedance/seedream"
+    assert build("p", "4:5") == {"prompt": "p", "image_size": "portrait_4_3"}
+
+    monkeypatch.setattr(settings, "KIE_IMAGE_MODEL", "nano-banana-2")  # a raw id pins one model
+    model_id, build = resolve_model("anything at all", "")
+    assert model_id == "nano-banana-2"
+    assert build("p", "4:5") == {"prompt": "p", "output_format": "png", "aspect_ratio": "4:5", "resolution": "2K"}
+
+
+def test_the_post_decides_the_model(client, db, kie):
+    post = make_post(db, content="Our supplement packaging landed on the shelf at the store.", topic="retail")
+    assert client.post(f"/api/queue/{post.id}/generate-image").status_code == 200
+    assert kie["body"]["model"] == "nano-banana-2"
+    assert kie["body"]["input"]["resolution"] == "2K"
+
+
+def test_a_model_that_is_down_falls_back_to_the_everyday_one(client, db, kie):
+    """kie.ai models go down (a failed task costs no credits) — the post still gets an image."""
+    kie["fail_models"] = {"nano-banana-2"}
+    post = make_post(db, content="Our supplement packaging landed on the shelf at the store.", topic="retail")
+    r = client.post(f"/api/queue/{post.id}/generate-image")
+    assert r.status_code == 200, r.text
+    assert kie["models"] == ["nano-banana-2", "google/nano-banana"]
+    db.refresh(post)
+    assert post.has_image
