@@ -47,6 +47,25 @@ python app.py
 
 Open **http://localhost:8000**. The **Home** page shows a setup checklist; work through it top to bottom.
 
+### Or start it with Docker
+
+If you have Docker Desktop, you can skip the Python setup above (you still need `.env`):
+
+```bash
+docker compose up -d --build
+```
+
+The app is then at the same address, **http://localhost:8000**.
+
+| What you want | Command |
+|---|---|
+| See what it's doing | `docker compose logs -f` |
+| Stop it | `docker compose down` |
+| Start it again | `docker compose up -d` |
+| Apply code or dependency changes | `docker compose up -d --build` |
+
+Your keys, database, brand voice and generated images stay in the project folder on your computer and are mounted into the container, so nothing is lost when it's rebuilt. The port is published to your machine only, so the dashboard is never reachable from your network. Run either the Docker copy or `python app.py`, not both: they share one database and one port.
+
 ### Fill in your Brand Voice (most important)
 
 Open **Brand Voice**. Each section has a hint and an example. Replace every `[bracket]` with your own words; a section turns green when no brackets are left. Until the five core sections are done (Who I Am, What My Business Does, Audience, Voice & Tone, Content Pillars), drafts stay generic and never invent personal facts.
@@ -173,7 +192,17 @@ LinkedIn connection and what your permissions allow, **Test connection**, limits
 ## 6. Images, scraping and optional services
 
 - **Post images (kie.ai or Gemini).**
-  - **Gen Image** creates a 4:5 image for the post using kie.ai's Nano Banana model (about 4 credits each), or Gemini if only `GEMINI_API_KEY` is set.
+  - **Gen Image** creates a 4:5 image for the post. With `KIE_IMAGE_MODEL=auto` (the default) the app picks the model to match the post:
+
+    | The post is about | Model | Cost and speed |
+    |---|---|---|
+    | Illustration, cartoon, sketch | `bytedance/seedream` | ~3.5 credits, ~7s |
+    | Products, photoreal scenes, detail, or text in the image | `nano-banana-2` at 2K | ~12 credits, ~45s |
+    | Everything else | `google/nano-banana` | ~4 credits, ~15s |
+
+  - To always use one model, set `KIE_IMAGE_MODEL` to `fast`, `detail`, `poster`, or a kie.ai model id.
+  - If a model is down at kie.ai, the app retries once with `google/nano-banana`. A failed attempt costs no credits.
+  - Gemini is used only when `KIE_API_KEY` is empty and `GEMINI_API_KEY` is set.
   - Images avoid text, invented numbers, logos and real people.
   - You review the image with the post.
 - **Scraping (Apify, optional).**

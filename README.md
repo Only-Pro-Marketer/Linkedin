@@ -74,7 +74,17 @@ flowchart LR
 | | **Profile Optimizer** | 9-part profile scorecard with rewrites |
 | | **Settings** | Connection test, limits and toggles, posting times, AI usage by feature |
 
-**Images:** the **Gen Image** button creates a post image with [kie.ai](https://kie.ai) (Nano Banana), or with Google Gemini when only that key is set. Images avoid invented numbers and logos.
+**Images:** the **Gen Image** button creates a post image with [kie.ai](https://kie.ai), or with Google Gemini when only that key is set. Images avoid invented numbers, logos and real people.
+
+With `KIE_IMAGE_MODEL=auto` (the default) the post decides the model:
+
+| The post is about | Model | Cost and speed |
+|---|---|---|
+| Illustration, cartoon, sketch | `bytedance/seedream` | ~3.5 credits, ~7s |
+| Products, photoreal scenes, detail, text in the image | `nano-banana-2` (2K) | ~12 credits, ~45s |
+| Everything else | `google/nano-banana` | ~4 credits, ~15s |
+
+If a model is down at kie.ai, the app retries once with `google/nano-banana`, so a post still gets an image. Set `KIE_IMAGE_MODEL` to `fast`, `detail`, `poster` or any kie.ai model id to always use one.
 
 ## Safety and security
 
@@ -122,6 +132,20 @@ Open **http://localhost:8000** and follow the checklist on Home:
 - `w_member_social` (default): publish posts, comments and reactions.
 - `r_member_social` (needs LinkedIn approval): read post stats automatically. Without it, type the numbers into History.
 
+### Run with Docker instead
+
+Same app, no Python setup. You still need `.env` filled in first.
+
+```bash
+docker compose up -d --build
+```
+
+Open **http://localhost:8000**. `docker compose logs -f` shows what it's doing, and `docker compose down` stops it.
+
+- The port is published to your machine only, so the dashboard is never reachable from your network.
+- Your keys (`.env`), the database, your brand voice and generated images live on your computer and are mounted into the container, so nothing is lost when the container is rebuilt or removed.
+- Keys and the database are never copied into the image.
+
 ## Configuration
 
 Secrets live in `.env`. Limits and toggles can also be changed in **Settings**; those values override `.env`.
@@ -152,6 +176,8 @@ Secrets live in `.env`. Limits and toggles can also be changed in **Settings**; 
 pip install -r requirements-dev.txt
 python -m pytest -q
 ```
+
+`requirements.txt` holds only what the app needs to run. The optional screen-record and deep-research features need a browser, which comes with the dev requirements (`playwright install chromium` once). Keeping it out of the runtime list keeps about 134 MB out of the Docker image.
 
 Tests use a temporary database, a fake Claude and mocked LinkedIn, kie.ai and Apify, so they need no keys or network. See [`CLAUDE.md`](CLAUDE.md) for the architecture and the rules the code relies on.
 
