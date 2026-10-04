@@ -1,9 +1,13 @@
 """Images for LinkedIn posts.
 
-Uses kie.ai (default model google/nano-banana) when KIE_API_KEY is set, and
-Google Gemini when only GEMINI_API_KEY is set. Images are saved under
-dashboard/static/images/generated and attached to the post for review;
-nothing is published until the post is approved.
+Uses kie.ai when KIE_API_KEY is set, and Google Gemini when only GEMINI_API_KEY
+is set. Images are saved under dashboard/static/images/generated and attached to
+the post for review; nothing is published until the post is approved.
+
+kie.ai offers several image models and they are not interchangeable: they cost
+different amounts, they are good at different things, and each takes its own
+input fields. KIE_IMAGE_MODEL="auto" (the default) picks one per post with
+choose_model(); set it to a key or a model id to always use one.
 """
 
 import base64
@@ -31,6 +35,65 @@ KIE_TIMEOUT_SECONDS = 150
 MAX_IMAGE_BYTES = 15 * 1024 * 1024
 EXTENSIONS = {"image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg", "image/webp": "webp"}
 NO_PROVIDER = "Add KIE_API_KEY (kie.ai) or GEMINI_API_KEY to .env to generate images, then restart the app."
+
+# Seedream takes a size name, not a ratio, and has no 4:5 (docs.kie.ai).
+SEEDREAM_SIZE = {"4:5": "portrait_4_3", "3:4": "portrait_4_3", "9:16": "portrait_16_9",
+                 "1:1": "square_hd", "4:3": "landscape_4_3", "16:9": "landscape_16_9"}
+
+KIE_MODELS: dict[str, dict] = {
+    "fast": {
+        "id": "google/nano-banana",
+        "about": "Everyday feed images. Cheapest and quickest.",
+        "input": lambda prompt, aspect: {"prompt": prompt[:5000], "output_format": "png", "aspect_ratio": aspect},
+    },
+    "detail": {
+        "id": "nano-banana-2",
+        "about": "Photoreal scenes, products, fine detail, and the only model that renders short text legibly. 2K.",
+        "input": lambda prompt, aspect: {"prompt": prompt[:20000], "output_format": "png",
+                                         "aspect_ratio": aspect, "resolution": "2K"},
+    },
+    "poster": {
+        "id": "bytedance/seedream",
+        "about": "Flat vector illustration and poster layouts.",
+        "input": lambda prompt, aspect: {"prompt": prompt[:5000],
+                                         "image_size": SEEDREAM_SIZE.get(aspect, "portrait_4_3")},
+    },
+}
+
+# Words in the post that say what the image has to do. Checked in this order.
+# (flux-2/pro-text-to-image and flux-2/flex-text-to-image looked right for photoreal
+# work, but both returned "Internal Error" from kie.ai when tested on 2026-09-17,
+# so photoreal posts go to nano-banana-2. A failed task costs no credits.)
+PHOTO_WORDS = ("product", "packaging", "package", "bottle", "label", "shelf", "retail", "store",
+               "storefront", "warehouse", "unboxing", "sample", "prototype", "supplement", "skincare",
+               "apparel", "shipping", "inventory")
+DETAIL_WORDS = ("checklist", "framework", "step ", "steps", "diagram", "funnel", "before and after",
+                "comparison", "versus", " vs ", "breakdown", "quote", "headline", "timeline")
+POSTER_WORDS = ("illustration", "cartoon", "comic", "sketch", "doodle", "flat art", "vector art")
+
+
+def choose_model(post_content: str, topic: str = "") -> str:
+    """Pick the kie.ai model that fits this post: a key of KIE_MODELS."""
+    text = f"{topic} {post_content}".lower()
+    if any(w in text for w in POSTER_WORDS):
+        return "poster"
+    if any(w in text for w in PHOTO_WORDS + DETAIL_WORDS):
+        return "detail"
+    return "fast"
+
+
+def resolve_model(post_content: str = "", topic: str = "") -> tuple[str, dict]:
+    """(model id, input builder) from KIE_IMAGE_MODEL: "auto", a key, or a raw kie.ai model id."""
+    choice = (settings.KIE_IMAGE_MODEL or "auto").strip()
+    if choice == "auto":
+        model = KIE_MODELS[choose_model(post_content, topic)]
+        return model["id"], model["input"]
+    if choice in KIE_MODELS:
+        return KIE_MODELS[choice]["id"], KIE_MODELS[choice]["input"]
+    for model in KIE_MODELS.values():  # a raw model id, e.g. KIE_IMAGE_MODEL=nano-banana-2
+        if model["id"] == choice:
+            return model["id"], model["input"]
+    return choice, KIE_MODELS["fast"]["input"]  # unknown id: send it with the plain fields
 
 
 class ImageError(RuntimeError):
@@ -112,17 +175,17 @@ class ImageGenerator:
         self._sleep = sleep
 
     def generate_image(self, post_content: str, topic: str = "") -> dict:
-        """{'success', 'image_path', 'image_prompt', 'provider', 'credits'} or {'success': False, 'error'}."""
+        """{'success', 'image_path', 'image_prompt', 'provider', 'model', 'credits'} or {'success': False, 'error'}."""
         prompt = _build_image_prompt(post_content, topic)
         try:
-            result = self._kie(prompt) if self.provider == "kie" else self._gemini(prompt)
+            result = self._kie(prompt, post_content, topic) if self.provider == "kie" else self._gemini(prompt)
         except ImageError as e:
             logger.warning("Image generation failed (%s): %s", self.provider, e)
             return {"success": False, "error": str(e)}
         except Exception:
             logger.exception("Image generation failed (%s)", self.provider)
             return {"success": False, "error": "Image generation failed. See posting.log for details."}
-        logger.info("Image generated via %s: %s", self.provider, result["image_path"])
+        logger.info("Image generated via %s (%s): %s", self.provider, result.get("model", "-"), result["image_path"])
         return {"success": True, "image_prompt": prompt, "provider": self.provider, **result}
 
     # ── kie.ai ────────────────────────────────────────────────
@@ -132,10 +195,26 @@ class ImageGenerator:
             return httpx.Client(transport=self._transport, timeout=30)
         return httpx.Client(timeout=30)
 
-    def _kie(self, prompt: str) -> dict:
+    def _kie(self, prompt: str, post_content: str = "", topic: str = "") -> dict:
+        """Generate with the model that fits the post, falling back to the cheap one."""
+        model_id, build_input = resolve_model(post_content, topic)
+        fallback = KIE_MODELS["fast"]
+        try:
+            return self._kie_task(prompt, model_id, build_input)
+        except ImageError as first:
+            if model_id == fallback["id"]:
+                raise
+            # A model can be down at kie.ai (a failed task costs no credits), so try
+            # the everyday model once rather than leaving the post without an image.
+            logger.warning("kie.ai model %s failed (%s); retrying with %s", model_id, first, fallback["id"])
+            try:
+                return self._kie_task(prompt, fallback["id"], fallback["input"])
+            except ImageError:
+                raise first from None
+
+    def _kie_task(self, prompt: str, model_id: str, build_input) -> dict:
         headers = {"Authorization": f"Bearer {settings.KIE_API_KEY}", "Content-Type": "application/json"}
-        body = {"model": settings.KIE_IMAGE_MODEL,
-                "input": {"prompt": prompt[:5000], "output_format": "png", "aspect_ratio": settings.KIE_IMAGE_ASPECT}}
+        body = {"model": model_id, "input": build_input(prompt, settings.KIE_IMAGE_ASPECT)}
         with self._client() as client:
             created = _kie_json(client.post(f"{KIE_BASE}/createTask", json=body, headers=headers))
             task_id = (created.get("data") or {}).get("taskId")
@@ -163,7 +242,7 @@ class ImageGenerator:
             if not urls:
                 raise ImageError("kie.ai finished but returned no image.")
             image_bytes, ext = self._download(client, urls[0])
-        return {"image_path": _save(image_bytes, ext), "credits": info.get("creditsConsumed")}
+        return {"image_path": _save(image_bytes, ext), "credits": info.get("creditsConsumed"), "model": model_id}
 
     def _check(self, url: str) -> None:
         if self._transport is not None:  # tests: no DNS lookups

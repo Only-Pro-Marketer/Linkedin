@@ -48,7 +48,9 @@ class Settings(BaseSettings):
     GEMINI_MODEL: str = "gemini-2.5-flash-image"
     # kie.ai image generation (used instead of Gemini when KIE_API_KEY is set)
     KIE_API_KEY: str = ""
-    KIE_IMAGE_MODEL: str = "google/nano-banana"
+    # "auto" picks a model per post (see content/image_generator.KIE_MODELS);
+    # or set a key (fast / detail / photo / poster) or a kie.ai model id.
+    KIE_IMAGE_MODEL: str = "auto"
     KIE_IMAGE_ASPECT: str = "4:5"  # LinkedIn feed images work best at 1:1 or 4:5
     IMAGE_AUTO_GENERATE: bool = False
 
