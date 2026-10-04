@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Apify actor IDs
 PROFILE_ACTOR = "dev_fusion/linkedin-profile-scraper"
+POSTS_ACTOR = "harvestapi/linkedin-profile-posts"
 
 
 def _profile_error_message(error: str) -> str:
@@ -26,7 +27,6 @@ def _profile_error_message(error: str) -> str:
                 "Photo, headline and follower count need the Apify profile scraper, "
                 "which is waiting for your approval in the Apify console.")
     return f"Posts scraped, but the profile details failed: {error[:200]}"
-POSTS_ACTOR = "harvestapi/linkedin-profile-posts"
 
 
 def _extract_username(linkedin_url: str) -> str | None:
@@ -117,10 +117,16 @@ class CompetitorScraper:
         profile_error = self._fetch_profile(comp, profile_url)
 
         # 2. Fetch posts
-        new_count = self._fetch_posts(comp, profile_url, max_posts=max_posts)
+        new_count, author_from_posts = self._fetch_posts(comp, profile_url, max_posts=max_posts)
 
         # 3. Update stats
         self._recalculate_stats(comp)
+
+        # The posts carry the photo, name and headline, so a blocked profile actor
+        # only costs the follower count.
+        if profile_error and author_from_posts:
+            profile_error = ("Follower count needs the Apify profile scraper, which is waiting for your "
+                             "approval. Photo, name and headline came from the posts.")
 
         comp.last_scraped_at = datetime.utcnow()
         comp.scrape_status = "partial" if profile_error else "success"
@@ -170,8 +176,11 @@ class CompetitorScraper:
             logger.warning("Profile fetch error for %s: %s", profile_url, e)
             return _profile_error_message(str(e))
 
-    def _fetch_posts(self, comp: Competitor, profile_url: str, max_posts: int = 20) -> int:
-        """Fetch recent posts via Apify and store new ones. Raises ApifyError if the fetch fails."""
+    def _fetch_posts(self, comp: Competitor, profile_url: str, max_posts: int = 20) -> tuple[int, bool]:
+        """Fetch recent posts via Apify and store new ones. Raises ApifyError if the fetch fails.
+
+        Returns (new posts stored, whether the posts carried the author's details).
+        """
         items = run_actor_items(
             POSTS_ACTOR,
             {"targetUrls": [profile_url], "maxPosts": max_posts, "scrapeReactions": False, "scrapeComments": False},
@@ -179,7 +188,9 @@ class CompetitorScraper:
         )
         if not items:
             logger.warning("No posts returned for %s", profile_url)
-            return 0
+            return 0, False
+
+        author_filled = self._author_from_posts(comp, items)
 
         new_count = 0
         for raw_post in items:
@@ -188,7 +199,34 @@ class CompetitorScraper:
 
         self.db.commit()
         logger.info("Fetched %d new posts for %s", new_count, comp.name)
-        return new_count
+        return new_count, author_filled
+
+    def _author_from_posts(self, comp: Competitor, items: list[dict]) -> bool:
+        """Take the photo, real name and headline from the posts themselves.
+
+        Each post carries its author, so a competitor keeps a face and a name even
+        when the separate profile actor is unavailable. (Only the follower count
+        needs that actor.) LinkedIn's image links expire, so they are refreshed on
+        every scrape.
+        """
+        author = next((i["author"] for i in items if isinstance(i.get("author"), dict)), None)
+        if not author:
+            return False
+
+        avatar = author.get("avatar")
+        url = avatar.get("url") if isinstance(avatar, dict) else avatar
+        if url:
+            comp.profile_picture = url
+
+        name = (author.get("name") or "").strip()
+        if name and comp.name in ("", None, comp.linkedin_username):
+            comp.name = name
+
+        headline = (author.get("info") or "").strip()
+        if headline:
+            comp.headline = headline
+
+        return bool(url or name or headline)
 
     def _store_post(self, comp: Competitor, raw: dict) -> bool:
         """Parse a raw Apify post and store it if it's new."""

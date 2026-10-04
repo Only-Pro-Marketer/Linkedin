@@ -127,3 +127,73 @@ def test_a_blocked_profile_actor_is_reported_not_silent(db, monkeypatch):
     assert comp.scrape_status == "partial"
     assert "waiting for your approval" in comp.scrape_error
     assert "console.apify.com" in comp.scrape_error
+
+
+def test_photo_and_name_come_from_the_posts(db, monkeypatch):
+    """Each post carries its author, so a competitor has a face even when the
+    profile actor is blocked; only the follower count depends on that actor."""
+    import research.competitor_scraper as cs
+    from database.models import Competitor
+
+    comp = Competitor(name="dbolzmann", linkedin_url="https://www.linkedin.com/in/dbolzmann")
+    db.add(comp)
+    db.commit()
+
+    post = {
+        "id": "p1",
+        "content": "A post long enough to be stored by the scraper, with something to say.",
+        "linkedinUrl": "https://www.linkedin.com/feed/update/urn:li:activity:1",
+        "engagement": {"likes": 10, "comments": 2, "shares": 1},
+        "author": {"name": "Daniela Anavitarte Bolzmann", "info": "Amazon content for 8-figure brands",
+                   "avatar": {"url": "https://media.licdn.com/dms/image/v2/photo.jpg"}},
+    }
+
+    def fake_run(actor, payload, timeout_s=None, **kw):
+        if actor == cs.PROFILE_ACTOR:
+            raise cs.ApifyError("This Actor requires full access to your account. You must approve its permissions")
+        return [post]
+
+    monkeypatch.setattr(cs, "run_actor_items", fake_run)
+    monkeypatch.setattr(cs, "available", lambda: True)
+
+    cs.CompetitorScraper(db).scrape_competitor(comp)
+
+    assert comp.profile_picture == "https://media.licdn.com/dms/image/v2/photo.jpg"
+    assert comp.name == "Daniela Anavitarte Bolzmann"
+    assert comp.headline == "Amazon content for 8-figure brands"
+    assert comp.scrape_status == "partial"
+    assert "Follower count" in comp.scrape_error
+
+
+def test_error_text_never_carries_a_credential():
+    """Scrape errors are stored on the competitor and shown in the UI."""
+    from research.apify_linkedin import _friendly
+
+    msg = _friendly(RuntimeError("Server error '500' for url 'https://api.apify.com/v2/acts/x/runs?token=abc123SECRET'"))
+    assert "abc123SECRET" not in msg
+    assert "token=***" in msg
+
+
+def test_without_author_data_the_message_still_names_the_photo(db, monkeypatch):
+    """Posts without an author must not claim the photo came from them."""
+    import research.competitor_scraper as cs
+    from database.models import Competitor
+
+    comp = Competitor(name="someone", linkedin_url="https://www.linkedin.com/in/someone",
+                      profile_picture="https://media.licdn.com/old-photo.jpg")
+    db.add(comp)
+    db.commit()
+
+    def fake_run(actor, payload, timeout_s=None, **kw):
+        if actor == cs.PROFILE_ACTOR:
+            raise cs.ApifyError("This Actor requires full access to your account. You must approve its permissions")
+        return [{"id": "p1", "content": "A post with enough text in it to be stored by the scraper."}]
+
+    monkeypatch.setattr(cs, "run_actor_items", fake_run)
+    monkeypatch.setattr(cs, "available", lambda: True)
+
+    cs.CompetitorScraper(db).scrape_competitor(comp)
+
+    assert comp.scrape_status == "partial"
+    assert "Photo, headline and follower count" in comp.scrape_error
+    assert "came from the posts" not in comp.scrape_error
