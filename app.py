@@ -1,15 +1,22 @@
 """LinkedIn Content Engine — FastAPI application entry point."""
 
 import logging
+import os
 from contextlib import asynccontextmanager
+
+# LOG_FILE lets a container write the log to a mounted folder, since the app
+# directory itself may not be writable. If the file can't be opened, the console
+# handler alone is enough — a log file is never a reason to fail to start.
+_handlers: list[logging.Handler] = [logging.StreamHandler()]
+try:
+    _handlers.append(logging.FileHandler(os.environ.get("LOG_FILE", "posting.log")))
+except OSError as exc:  # read-only directory, no permission, bad path
+    print(f"File logging is off ({exc}); logging to the console only.")
 
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s %(levelname)s:%(name)s: %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("posting.log"),
-    ],
+    handlers=_handlers,
 )
 
 from fastapi import FastAPI  # noqa: E402

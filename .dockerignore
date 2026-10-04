@@ -1,0 +1,35 @@
+# Secrets and data never go into the image — they are mounted at run time.
+.env
+.env.*
+!.env.example
+database/
+*.db
+*.db-wal
+*.db-shm
+
+# Generated media (mounted from the host)
+dashboard/static/images/generated/
+dashboard/static/videos/generated/
+dashboard/static/videos/uploads/
+
+# Local tooling and build noise
+.venv/
+venv/
+env/
+.git/
+.gitignore
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.claude/
+*.log
+logs/
+
+# Not needed to run the app
+tests/
+requirements-dev.txt
+docs/
+*.md
+!README.md
+.DS_Store
