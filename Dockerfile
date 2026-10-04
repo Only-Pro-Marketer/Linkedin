@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # The app itself. Keys (.env), the database and generated media stay out of the
 # image (.dockerignore) and are mounted at run time instead.
+# Playwright is not installed here (it is ~134 MB and only the optional screen-record
+# and deep-research features use it), so those two stay off in the container.
 COPY . .
 
 EXPOSE 8000

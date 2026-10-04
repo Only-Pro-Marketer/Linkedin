@@ -54,16 +54,54 @@
         <div class="metric-sub">approved or scheduled</div>
     </a>
     <a href="/history" class="card metric">
-        <div class="metric-label">Published · 7 days</div>
+        <div class="metric-label">Published this week</div>
         <div class="metric-value">{{ published_week }}</div>
-        <div class="metric-sub">limit {{ posts_per_day }} per day</div>
+        <div class="metric-sub">
+            {% set change = published_week - published_prev_week %}
+            {% if change > 0 %}{{ change }} more than last week
+            {% elif change < 0 %}{{ -change }} fewer than last week
+            {% else %}same as last week{% endif %}
+        </div>
     </a>
-    <a href="/settings" class="card metric">
-        <div class="metric-label">AI usage · 30 days</div>
-        <div class="metric-value">{% if usage.cost_usd is not none %}${{ '%.2f'|format(usage.cost_usd) }}{% else %}{{ usage.calls }}{% endif %}</div>
-        <div class="metric-sub">{{ usage.calls }} Claude calls</div>
+    <a href="/history" class="card metric">
+        <div class="metric-label">Results recorded</div>
+        {% if results.recorded %}
+            <div class="metric-value">{{ '{:,}'.format(results.impressions) if results.impressions else results.reactions }}</div>
+            <div class="metric-sub">{{ 'impressions' if results.impressions else 'reactions' }} from {{ results.recorded }} of {{ results.posted }} posts</div>
+        {% elif results.posted %}
+            <div class="metric-value" style="font-size: 20px;">None yet</div>
+            <div class="metric-sub">Add LinkedIn's numbers so the app learns →</div>
+        {% else %}
+            <div class="metric-value" style="font-size: 20px;">—</div>
+            <div class="metric-sub">after your first post goes out</div>
+        {% endif %}
     </a>
 </div>
+
+{% if weeks and results.posted %}
+<div class="card card-pad fade-in-up" style="margin-bottom: 20px;">
+    <div class="card-head">
+        <div>
+            <div class="card-title">Posting rhythm</div>
+            <div class="card-sub">Posts published each week</div>
+        </div>
+        <a href="/history" class="link-accent">History →</a>
+    </div>
+    <div class="weekbars">
+        {% for w in weeks %}
+        <div class="weekbar{% if w.this_week %} now{% endif %}" title="{{ w.count }} post{{ 's' if w.count != 1 }} in the week of {{ w.label }}">
+            <b>{{ w.count }}</b>
+            <i style="height: {{ w.height }}px"></i>
+            <span>{{ w.label }}</span>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="tiny muted" style="margin-top: 12px;">
+        AI spend, last 30 days: {% if usage.cost_usd is not none %}${{ '%.2f'|format(usage.cost_usd) }}{% else %}{{ usage.calls }} calls{% endif %} ·
+        <a href="/settings" class="link-accent">Settings</a>
+    </p>
+</div>
+{% endif %}
 
 {% if failed %}
 <a href="/history?tab=failed" class="card card-pad fade-in-up" style="display: flex; align-items: center; gap: 12px; margin-bottom: 20px; text-decoration: none; border-color: #fecdca; background: #fffbfa;">
@@ -94,7 +132,7 @@
                             <span class="q-badge q-none"><span class="q-dot"></span>Not checked</span>
                         {% endif %}
                         <span>{{ item.template }}</span>
-                        {% if item.virality %}<span>· reach {{ item.virality }}/100</span>{% endif %}
+                        {% if item.reach %}<span title="Predicted reach score {{ item.virality }} of 100">· predicted reach: {{ item.reach }}</span>{% endif %}
                     </div>
                 </div>
                 <a href="/queue#post-{{ item.id }}" class="btn btn-ghost btn-sm">Review</a>

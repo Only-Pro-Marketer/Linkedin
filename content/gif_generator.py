@@ -412,7 +412,13 @@ class ScreenRecordGifGenerator:
         from utils.netguard import check_public_url
         check_public_url(url)  # raises UnsafeURLError for local/private targets
 
-        from playwright.async_api import async_playwright
+        try:
+            from playwright.async_api import async_playwright
+        except ImportError as e:  # not installed in the Docker image, see requirements-dev.txt
+            raise RuntimeError(
+                "Screen recording needs Playwright, which this install does not have. "
+                "Run: pip install playwright && playwright install chromium"
+            ) from e
 
         actions = actions or [
             {"type": "wait", "ms": 1000},

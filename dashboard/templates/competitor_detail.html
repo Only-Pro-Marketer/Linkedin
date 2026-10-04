@@ -285,6 +285,7 @@ function renderProfile() {
 
     const scrapeStatus = p.scrape_status === 'success'
         ? `Last scraped ${p.last_scraped_at ? timeAgo(p.last_scraped_at) : 'recently'}`
+        : p.scrape_status === 'partial' ? (p.scrape_error || 'Posts scraped, profile details missing')
         : p.scrape_status === 'failed' ? 'Scrape failed' : 'Not scraped yet';
     document.getElementById('profile-scrape-status').textContent = scrapeStatus;
     document.getElementById('profile-tracked-since').textContent = p.created_at ? 'Tracking since ' + new Date(p.created_at).toLocaleDateString() : '';

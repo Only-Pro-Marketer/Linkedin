@@ -42,8 +42,17 @@ def _field(obj, dict_key: str, attr: str):
     return getattr(value, "value", value)  # enums → their value
 
 
+CREDENTIAL = re.compile(r"(token|api[_-]?key|secret|password)=([^\s&\"']+)", re.I)
+
+
+def _redact(text: str) -> str:
+    """Error text is shown in the UI and stored on the competitor, so strip anything
+    that looks like a credential a client library may have put in a URL."""
+    return CREDENTIAL.sub(r"\1=***", text)
+
+
 def _friendly(e: Exception) -> str:
-    text = str(e)
+    text = _redact(str(e))
     low = text.lower()
     status = getattr(e, "status_code", None)
     if status == 401 or ("token" in low and ("invalid" in low or "not valid" in low)):
