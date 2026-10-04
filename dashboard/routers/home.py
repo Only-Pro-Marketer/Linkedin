@@ -92,8 +92,12 @@ def results_summary(db: Session) -> dict:
     from database.models import PostPerformance
 
     posted = db.query(QueuedPost).filter(QueuedPost.status == PostStatus.POSTED).count()
+    # Joined to the posts: deleting a post leaves its performance row behind
+    # (no delete cascade), and an orphan would inflate "recorded".
     rows = (
         db.query(PostPerformance)
+        .join(QueuedPost, PostPerformance.post_id == QueuedPost.id)
+        .filter(QueuedPost.status == PostStatus.POSTED)
         .filter((PostPerformance.impressions > 0) | (PostPerformance.likes > 0)
                 | (PostPerformance.comments > 0) | (PostPerformance.shares > 0))
         .all()
