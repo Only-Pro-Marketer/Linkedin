@@ -1378,6 +1378,7 @@ def api_get_competitors(db: Session = Depends(get_db)):
             "posting_frequency": c.posting_frequency,
             "last_scraped_at": to_iso(c.last_scraped_at),
             "scrape_status": c.scrape_status,
+            "scrape_error": c.scrape_error,
             "created_at": to_iso(c.created_at),
             "updated_at": to_iso(c.updated_at),
         })
@@ -1697,6 +1698,7 @@ def api_competitor_detail(competitor_id: int, db: Session = Depends(get_db)):
             "posting_frequency": comp.posting_frequency,
             "last_scraped_at": to_iso(comp.last_scraped_at),
             "scrape_status": comp.scrape_status,
+            "scrape_error": comp.scrape_error,
             "created_at": to_iso(comp.created_at),
         },
         "stats": {

@@ -335,6 +335,8 @@ function renderCompetitors() {
 
         const scrapeStatusHtml = c.scrape_status === 'success'
             ? `<span class="text-[10px] text-green-500">Scraped ${c.last_scraped_at ? timeAgo(c.last_scraped_at) : ''}</span>`
+            : c.scrape_status === 'partial'
+            ? `<span class="text-[10px] text-amber-600" title="${escapeHtml(c.scrape_error || '')}">Posts only — no photo or headline</span>`
             : c.scrape_status === 'failed'
             ? `<span class="text-[10px] text-red-500">Scrape failed</span>`
             : `<span class="text-[10px] text-gray-400">Not scraped</span>`;

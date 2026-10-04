@@ -100,3 +100,30 @@ def test_manual_autoresearch_waits_for_real_posts(client):
     settings.AUTORESEARCH_ENABLED = True  # restored after the test by conftest
     r = client.post("/api/autoresearch/run")
     assert r.status_code == 400 and "published posts" in r.json()["error"]
+
+
+def test_a_blocked_profile_actor_is_reported_not_silent(db, monkeypatch):
+    """Posts can scrape while the profile actor is blocked; the competitor says so."""
+    import research.competitor_scraper as cs
+    from database.models import Competitor
+
+    comp = Competitor(name="dbolzmann", linkedin_url="https://www.linkedin.com/in/dbolzmann")
+    db.add(comp)
+    db.commit()
+
+    def fake_run(actor, payload, timeout_s=None, **kw):
+        if actor == cs.PROFILE_ACTOR:
+            raise cs.ApifyError(
+                "Apify error: This Actor requires full access to your account. You must approve its "
+                "permissions before running it: https://console.apify.com/actors/2SyF0bVxmgGr8IVCZ?approvePermissions=true"
+            )
+        return []
+
+    monkeypatch.setattr(cs, "run_actor_items", fake_run)
+    monkeypatch.setattr(cs, "available", lambda: True)
+
+    cs.CompetitorScraper(db).scrape_competitor(comp)
+
+    assert comp.scrape_status == "partial"
+    assert "waiting for your approval" in comp.scrape_error
+    assert "console.apify.com" in comp.scrape_error

@@ -15,6 +15,17 @@ logger = logging.getLogger(__name__)
 
 # Apify actor IDs
 PROFILE_ACTOR = "dev_fusion/linkedin-profile-scraper"
+
+
+def _profile_error_message(error: str) -> str:
+    """Say what to do about it, not just what went wrong."""
+    if "approve" in error.lower() and "permission" in error.lower():
+        link = next((w for w in error.split() if w.startswith("https://console.apify.com")), "")
+        return ("Photo, headline and follower count need the Apify profile scraper, which is waiting "
+                f"for your approval. Approve it once here: {link}" if link else
+                "Photo, headline and follower count need the Apify profile scraper, "
+                "which is waiting for your approval in the Apify console.")
+    return f"Posts scraped, but the profile details failed: {error[:200]}"
 POSTS_ACTOR = "harvestapi/linkedin-profile-posts"
 
 
@@ -102,8 +113,8 @@ class CompetitorScraper:
         is_first_scrape = comp.last_scraped_at is None
         max_posts = 100 if is_first_scrape else 20
 
-        # 1. Fetch profile data
-        self._fetch_profile(comp, profile_url)
+        # 1. Fetch profile data (photo, headline, followers)
+        profile_error = self._fetch_profile(comp, profile_url)
 
         # 2. Fetch posts
         new_count = self._fetch_posts(comp, profile_url, max_posts=max_posts)
@@ -112,8 +123,8 @@ class CompetitorScraper:
         self._recalculate_stats(comp)
 
         comp.last_scraped_at = datetime.utcnow()
-        comp.scrape_status = "success"
-        comp.scrape_error = None
+        comp.scrape_status = "partial" if profile_error else "success"
+        comp.scrape_error = profile_error
         self.db.commit()
 
         logger.info(
@@ -122,14 +133,19 @@ class CompetitorScraper:
         )
         return new_count
 
-    def _fetch_profile(self, comp: Competitor, profile_url: str):
-        """Fetch the competitor's LinkedIn profile info via Apify."""
+    def _fetch_profile(self, comp: Competitor, profile_url: str) -> str | None:
+        """Fetch the competitor's photo, headline and follower count via Apify.
+
+        Returns an error message when it fails. Posts can scrape fine while this
+        does not (the profile actor needs its own approval in Apify), which used
+        to leave the picture and headline silently blank.
+        """
         try:
             items = run_actor_items(PROFILE_ACTOR, {"profileUrls": [profile_url]}, timeout_s=120)
 
             if not items:
                 logger.warning("No profile data returned for %s", profile_url)
-                return
+                return "The profile scraper returned nothing for this person."
 
             profile = items[0]
 
@@ -148,9 +164,11 @@ class CompetitorScraper:
                 comp.name = full_name
 
             logger.info("Updated profile for %s: %s followers", comp.name, comp.follower_count)
+            return None
 
         except Exception as e:
             logger.warning("Profile fetch error for %s: %s", profile_url, e)
+            return _profile_error_message(str(e))
 
     def _fetch_posts(self, comp: Competitor, profile_url: str, max_posts: int = 20) -> int:
         """Fetch recent posts via Apify and store new ones. Raises ApifyError if the fetch fails."""
